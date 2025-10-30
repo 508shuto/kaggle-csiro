@@ -159,8 +159,9 @@ def predict(
         batch_predictions = []
 
         if use_amp and device_type == "cuda":
-            with torch.cuda.amp.autocast():
-                pred = model(images)
+            with torch.no_grad():
+                with torch.amp.autocast(device_type=device_type):
+                    pred = model(images)
             batch_predictions.append(pred.cpu().detach().numpy())
         else:
             with torch.no_grad():
@@ -168,21 +169,33 @@ def predict(
             batch_predictions.append(pred.cpu().detach().numpy())
 
         # TTA (Test Time Augmentation)
-        if use_tta:
-            # Horizontal flip
+        if use_tta and use_amp and device_type == "cuda":
             with torch.no_grad():
+                with torch.amp.autocast(device_type=device_type):
+                    # Horizontal flip
+                    hflip_pred = model(torch.flip(images, dims=[3]))
+                    batch_predictions.append(hflip_pred.cpu().detach().numpy())
+                    # Vertical flip
+                    vflip_pred = model(torch.flip(images, dims=[2]))
+                    batch_predictions.append(vflip_pred.cpu().detach().numpy())
+                    # Rot90
+                    rot90_pred = model(torch.rot90(images, k=1, dims=[2, 3]))
+                    batch_predictions.append(rot90_pred.cpu().detach().numpy())
+                    # Rot270
+                    rot270_pred = model(torch.rot90(images, k=3, dims=[2, 3]))
+                    batch_predictions.append(rot270_pred.cpu().detach().numpy())
+        elif use_tta:
+            with torch.no_grad():
+                # Horizontal flip
                 hflip_pred = model(torch.flip(images, dims=[3]))
                 batch_predictions.append(hflip_pred.cpu().detach().numpy())
-            # Vertical flip
-            with torch.no_grad():
+                # Vertical flip
                 vflip_pred = model(torch.flip(images, dims=[2]))
                 batch_predictions.append(vflip_pred.cpu().detach().numpy())
-            # Rot90
-            with torch.no_grad():
+                # Rot90
                 rot90_pred = model(torch.rot90(images, k=1, dims=[2, 3]))
                 batch_predictions.append(rot90_pred.cpu().detach().numpy())
-            # Rot270
-            with torch.no_grad():
+                # Rot270
                 rot270_pred = model(torch.rot90(images, k=3, dims=[2, 3]))
                 batch_predictions.append(rot270_pred.cpu().detach().numpy())
 
@@ -220,6 +233,7 @@ def main(
         use_tta: Whether to use test time augmentation
     """
     config: DictConfig = OmegaConf.load(str(config_path))  # type: ignore
+    config.model.pretrained = False
 
     # Detect device if auto
     device = detect_device(device)

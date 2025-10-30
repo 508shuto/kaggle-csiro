@@ -1251,6 +1251,7 @@ dependencies = [
     { name = "albumentations" },
     { name = "jupyterlab" },
     { name = "kaggle" },
+    { name = "kagglehub" },
     { name = "marimo" },
     { name = "matplotlib" },
     { name = "numpy" },
@@ -1279,6 +1280,7 @@ requires-dist = [
     { name = "albumentations", specifier = ">=2.0.8" },
     { name = "jupyterlab", specifier = ">=4.4.10" },
     { name = "kaggle", specifier = "==1.6.17" },
+    { name = "kagglehub", specifier = ">=0.3.13" },
     { name = "marimo", specifier = ">=0.17.3" },
     { name = "matplotlib", specifier = ">=3.10.7" },
     { name = "numpy", specifier = ">=2.3.4" },
@@ -1300,6 +1302,21 @@ requires-dist = [
 dev = [
     { name = "pytest", specifier = ">=8.4.2" },
     { name = "ruff", specifier = ">=0.14.2" },
+]
+
+[[package]]
+name = "kagglehub"
+version = "0.3.13"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "packaging" },
+    { name = "pyyaml" },
+    { name = "requests" },
+    { name = "tqdm" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/1c/12/e13c1c8b203535b15dacc420c0f1596dda67463175ff1e4404af21815bdd/kagglehub-0.3.13.tar.gz", hash = "sha256:d3c8b6250627d665096cd91a9487559bf5ed61be607eaf63d14511b20eea646e", size = 113694, upload-time = "2025-08-26T16:17:33.486Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a4/8e/4077b08b95a1f8302c694a8b399bd413815fbe89045c41e6e08cd7d9439a/kagglehub-0.3.13-py3-none-any.whl", hash = "sha256:e00dec8b81396cbad9c7b5eb62a33cf8ae27da26227abd196ed8f054c845ca00", size = 68257, upload-time = "2025-08-26T16:17:32.13Z" },
 ]
 
 [[package]]

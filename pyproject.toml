@@ -8,6 +8,7 @@ dependencies = [
     "albumentations>=2.0.8",
     "jupyterlab>=4.4.10",
     "kaggle==1.6.17",
+    "kagglehub>=0.3.13",
     "marimo>=0.17.3",
     "matplotlib>=3.10.7",
     "numpy>=2.3.4",
