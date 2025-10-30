@@ -1,0 +1,90 @@
+# Kaggle CSIRO Competition
+
+CSIRO牧草評価コンペティション用のリポジトリです。
+
+## セットアップ
+
+```bash
+# 依存関係のインストール
+uv sync
+```
+
+## Kaggle Notebookでの実行手順
+
+### 1. 前処理: 画像をnumpy配列に変換
+
+train画像とtest画像をそれぞれnumpy配列に変換します。
+
+```bash
+# Train画像の変換
+python src/exp000/img2npy.py \
+  --input-dir ./input/train \
+  --output-dir ./output/exp000/train \
+  --image-size 256 \
+  --num-workers 4
+
+# Test画像の変換
+python src/exp000/img2npy.py \
+  --input-dir ./input/test \
+  --output-dir ./output/exp000/test \
+  --image-size 256 \
+  --num-workers 4
+```
+
+`--num-workers`はKaggle NotebookのCPUコア数に応じて調整してください（推奨: 2-4）。
+
+### 2. データセット作成
+
+```bash
+python src/exp000/create_dataset.py
+```
+
+### 3. 学習
+
+```bash
+python src/exp000/train.py --config-path ./config/exp000.yaml
+```
+
+### 4. 推論・提出ファイル生成
+
+```bash
+python src/exp000/inference.py \
+  --test-csv-path ./input/test.csv \
+  --config-path ./config/exp000.yaml \
+  --model-dir ./output/exp000 \
+  --output-dir ./output/exp000 \
+  --device cuda \
+  --batch-size 256 \
+  --num-workers 4 \
+  --use-amp true \
+  --use-tta false
+```
+
+## パラメータ説明
+
+### img2npy.py
+
+- `--input-dir`: 入力画像ディレクトリ
+- `--output-dir`: 出力numpyファイルディレクトリ
+- `--image-size`: リサイズ後の画像サイズ（学習時の`augmentation.valid.image_size`に合わせる）
+- `--num-workers`: 並列処理のワーカー数（デフォルト: min(4, cpu_count())）
+
+### inference.py
+
+- `--test-csv-path`: test.csvファイルのパス
+- `--config-path`: 設定ファイルのパス
+- `--model-dir`: モデルチェックポイントのディレクトリ
+- `--output-dir`: 出力ディレクトリ
+- `--folds`: 使用するfold番号のリスト（デフォルト: [0,1,2,3,4]）
+- `--device`: デバイス（cuda/cpu/mps）
+- `--batch-size`: 推論時のバッチサイズ
+- `--num-workers`: DataLoaderのワーカー数
+- `--use-amp`: Automatic Mixed Precisionの使用（推論高速化）
+- `--use-tta`: Test Time Augmentationの使用（Horizontal Flip対応）
+
+## 注意事項
+
+- Kaggle NotebookではCPUコア数が限られているため、`num_workers`は2-4程度を推奨します
+- `image_size`は学習時の`augmentation.valid.image_size`（config/exp000.yaml参照）に合わせてください
+- 推論は単一GPU前提です。fold同時実行の並列化は行いません（DataLoader並列化で十分です）
+
