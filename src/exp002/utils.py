@@ -1,16 +1,17 @@
 import albumentations as A
+import numpy as np
 import torch
 import torch.nn as nn
 from albumentations.pytorch import ToTensorV2
 from loss import (
     WeightedMSELoss,
+    AuxLoss,
 )
 from metrics import (
     WeightedR2Score,
 )
 from omegaconf import DictConfig
 import pytorch_lightning as L
-import numpy as np
 import random
 import os
 
@@ -38,6 +39,8 @@ def get_device() -> torch.device:
 def get_loss_fn(params: DictConfig, loss_name: str) -> nn.Module:
     if loss_name == "l2_loss":
         return WeightedMSELoss()
+    elif loss_name == "aux_loss":
+        return AuxLoss()
     else:
         raise ValueError(f"Loss function {loss_name} not found")
 
@@ -121,3 +124,48 @@ def get_transforms(mode: str, config: DictConfig) -> A.Compose:
             p=1.0,
             seed=config.experiment.seed,
         )
+
+
+def mixup_batch(
+    images: torch.Tensor,
+    targets_log: torch.Tensor,
+    aux_targets_log: torch.Tensor,
+    alpha: float = 0.2,
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, float]:
+    """Mixup data augmentation for regression tasks.
+
+    Args:
+        images: (B, C, H, W)
+        targets_log: (B, 5) log空間のターゲット
+        aux_targets_log: (B, 2) log空間の補助ターゲット
+        alpha: Beta分布のパラメータ
+
+    Returns:
+        mixed_images: (B, C, H, W)
+        mixed_targets_log: (B, 5) log空間の混合ターゲット
+        mixed_aux_targets_log: (B, 2) log空間の混合補助ターゲット
+        lam: mixing coefficient
+    """
+    if alpha > 0:
+        lam = np.random.beta(alpha, alpha)
+    else:
+        lam = 1.0
+
+    batch_size = images.size(0)
+    index = torch.randperm(batch_size, device=images.device)
+
+    # 画像をMix
+    mixed_images = lam * images + (1 - lam) * images[index]
+
+    # ターゲットを元の空間に戻してMix（回帰なので線形補間が適切）
+    targets = torch.expm1(targets_log)  # 元の空間
+    aux_targets = torch.expm1(aux_targets_log)  # 元の空間
+
+    mixed_targets = lam * targets + (1 - lam) * targets[index]
+    mixed_aux_targets = lam * aux_targets + (1 - lam) * aux_targets[index]
+
+    # log空間に戻す
+    mixed_targets_log = torch.log1p(mixed_targets)
+    mixed_aux_targets_log = torch.log1p(mixed_aux_targets)
+
+    return mixed_images, mixed_targets_log, mixed_aux_targets_log, lam

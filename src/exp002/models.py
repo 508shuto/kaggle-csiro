@@ -9,7 +9,7 @@ class CSIROModel(nn.Module):
         model_name: str = "efficientnet-b0",
         pretrained: bool = True,
         in_channels: int = 3,
-        out_channels: int = 5,
+        out_channels: int = 4,
         aux_out_channels: int = 2,
     ):
         super().__init__()
@@ -39,9 +39,27 @@ class CSIROModel(nn.Module):
     def forward(self, x):
         x = self.model(x)
         x = self.pool(x).flatten(1)
-        pred = self.head(x)
-        aux_pred = self.aux_head(x)
-        return pred, aux_pred
+
+        # 4つ予測: [Clover, Dead, Green, GDM] (log空間)
+        pred_4_log = self.head(x)  # (B, 4)
+
+        # 元の空間に戻して負値を除去
+        pred_4 = torch.clamp(torch.expm1(pred_4_log), min=0.0)  # (B, 4)
+
+        # Total_gを計算（物理制約を厳密に守る）
+        # Total = Clover + Dead + Green
+        total_g = pred_4[:, 0] + pred_4[:, 1] + pred_4[:, 2]  # (B,)
+
+        # 5つに拡張: [Clover, Dead, Green, GDM, Total]
+        pred = torch.cat([pred_4, total_g.unsqueeze(1)], dim=1)  # (B, 5)
+
+        # log空間に戻す
+        pred_log = torch.log1p(pred)  # (B, 5)
+
+        # 補助ターゲットもlog空間で予測
+        aux_pred_log = self.aux_head(x)  # (B, 2)
+
+        return pred_log, aux_pred_log
 
 
 if __name__ == "__main__":
@@ -62,7 +80,7 @@ if __name__ == "__main__":
         model_name=args.model_name,
         pretrained=args.pretrained,
         in_channels=args.in_channels,
-        out_channels=5,
+        out_channels=4,
         aux_out_channels=2,
     ).to(device)
     model.eval()

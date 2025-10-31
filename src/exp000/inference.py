@@ -85,6 +85,7 @@ class TestDataset(Dataset):
             image = torch.from_numpy(image).float()
         return image
 
+
 def predict_fold(
     fold: int,
     config: DictConfig,
@@ -130,6 +131,7 @@ def predict_fold(
     )
     return fold_predictions
 
+
 def predict(
     fold: int,
     model: nn.Module,
@@ -152,7 +154,11 @@ def predict(
         Array of predictions shape (N, 5)
     """
     fold_predictions = []
-    device_type = "cuda" if device.startswith("cuda") else ("mps" if device.startswith("mps") else "cpu")
+    device_type = (
+        "cuda"
+        if device.startswith("cuda")
+        else ("mps" if device.startswith("mps") else "cpu")
+    )
 
     for batch in tqdm(dataloader, desc=f"Fold {fold}"):
         images = batch.to(device)
@@ -205,6 +211,7 @@ def predict(
 
     fold_predictions = np.concatenate(fold_predictions, axis=0)
     return fold_predictions
+
 
 def main(
     test_csv_path: Path = Path("./input/test.csv"),
@@ -286,14 +293,15 @@ def main(
     # Create submission DataFrame
     submission_df = pd.DataFrame(
         {
-            "sample_id": [f"{sid}__{tname}" for sid, tname in zip(sample_ids, target_names_array)],
+            "sample_id": [
+                f"{sid}__{tname}" for sid, tname in zip(sample_ids, target_names_array)
+            ],
             "target": targets,
         }
     )
 
     submission_df.to_csv(output_dir / "submission.csv", index=False)
     print(f"Submission file saved to {output_dir / 'submission.csv'}")
-
 
 
 if __name__ == "__main__":

@@ -8,7 +8,7 @@ from timm.utils.model_ema import ModelEmaV3
 from torchmetrics import R2Score, MetricCollection
 from metrics import WeightedR2Score, WEIGHTS, CLASS_NAMES
 
-from utils import get_loss_fn
+from utils import get_loss_fn, mixup_batch
 
 
 class CSIROModule(L.LightningModule):
@@ -44,27 +44,38 @@ class CSIROModule(L.LightningModule):
         )
         self.aux_weight = config.aux_loss.weight
 
+        # Mixup設定
+        self.mixup_enabled = config.augmentation.train.get("mixup", {}).get(
+            "enabled", False
+        )
+        self.mixup_alpha = config.augmentation.train.get("mixup", {}).get("alpha", 0.2)
+        self.mixup_prob = config.augmentation.train.get("mixup", {}).get("prob", 0.5)
+
     def forward(self, x):
         return self.model(x)
 
     def training_step(self, batch, batch_idx):
         self.model_ema.update(self.model, self.global_step)
-        # NOTE: Dry_Total_g = Dry_Green_g + Dry_Dead_g + Dry_Clover_g
-        #       so how is it possible to reduce the num_outputs 5 to 4(drop to learn Dry_Total_g)?
-        # ?: Does the model learn the correlation between the targets, especially Dry_Green_g, Dry_Dead_g, Dry_Clover_g and Dry_Total_g?
-        # NOTE: how about using the Pre_GSHH_NDVI and Height_Ave_cm as a auxiliary_target?
-        # ?: How to use Sampling_Date and State?
 
-        # TODO: implement mixup
         image, targets, aux_targets = batch
-        pred, aux_pred = self.model(image)
-        loss = self.loss_fn(pred, targets) + self.aux_weight * self.aux_loss_fn(
-            aux_pred, aux_targets
+
+        # Mixup適用
+        if self.mixup_enabled and torch.rand(1).item() < self.mixup_prob:
+            image, targets, aux_targets, lam = mixup_batch(
+                image, targets, aux_targets, alpha=self.mixup_alpha
+            )
+            self.log("train_mixup_lambda", lam, on_step=False, on_epoch=True)
+
+        # 対数空間で予測・損失計算
+        pred_log, aux_pred_log = self.model(image)
+        loss = self.loss_fn(pred_log, targets) + self.aux_weight * self.aux_loss_fn(
+            aux_pred_log, aux_targets
         )
+
         self.log("train_loss", loss, prog_bar=True, on_step=False, on_epoch=True)
         self.log(
             "train_aux_loss",
-            self.aux_loss_fn(aux_pred, aux_targets),
+            self.aux_loss_fn(aux_pred_log, aux_targets),
             prog_bar=True,
             on_step=False,
             on_epoch=True,
@@ -72,20 +83,34 @@ class CSIROModule(L.LightningModule):
         return loss
 
     def validation_step(self, batch, batch_idx):
-        image, targets, aux_targets = batch
-        preds, aux_preds = self.model_ema.module(image)  # (B, 5)
+        image, targets_log, aux_targets_log = batch
 
-        loss = self.loss_fn(preds, targets) + self.aux_weight * self.aux_loss_fn(
-            aux_preds, aux_targets
-        )
+        # 対数空間で予測
+        preds_log, aux_preds_log = self.model_ema.module(image)  # (B, 5), (B, 2)
 
-        # TODO: inverse log1p transform
-        self.metrics.update(preds, targets)
-        self.aux_metrics.update(aux_preds, aux_targets)
+        # 対数空間でLoss計算
+        loss = self.loss_fn(
+            preds_log, targets_log
+        ) + self.aux_weight * self.aux_loss_fn(aux_preds_log, aux_targets_log)
+
+        # 元の空間に戻してメトリクス計算
+        preds = torch.expm1(preds_log)  # exp(x) - 1
+        aux_preds = torch.expm1(aux_preds_log)
+        targets_original = torch.expm1(targets_log)
+        aux_targets_original = torch.expm1(aux_targets_log)
+
+        # 負値を除去（念のため）
+        preds = torch.clamp(preds, min=0.0)
+        aux_preds = torch.clamp(aux_preds, min=0.0)
+
+        # メトリクスは元の空間で計算
+        self.metrics.update(preds, targets_original)
+        self.aux_metrics.update(aux_preds, aux_targets_original)
+
         self.log("val_loss", loss, prog_bar=True, on_step=False, on_epoch=True)
         self.log(
             "val_aux_loss",
-            self.aux_loss_fn(aux_preds, aux_targets),
+            self.aux_loss_fn(aux_preds_log, aux_targets_log),
             prog_bar=True,
             on_step=False,
             on_epoch=True,

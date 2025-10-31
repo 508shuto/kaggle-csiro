@@ -10,6 +10,21 @@ from metrics import (
     WeightedR2Score,
 )
 from omegaconf import DictConfig
+import pytorch_lightning as L
+import numpy as np
+import random
+import os
+
+
+def seed_everything(seed: int):
+    L.seed_everything(seed)
+    random.seed(seed)
+    np.random.seed(seed)
+    os.environ["PYTHONHASHSEED"] = str(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 
 
 def get_device() -> torch.device:
@@ -89,7 +104,7 @@ def get_transforms(mode: str, config: DictConfig) -> A.Compose:
         )
         augmentations.append(ToTensorV2(p=1.0))
         print(augmentations)
-        return A.Compose(augmentations, p=1.0)
+        return A.Compose(augmentations, p=1.0, seed=config.experiment.seed)
     else:
         return A.Compose(
             [
@@ -107,4 +122,5 @@ def get_transforms(mode: str, config: DictConfig) -> A.Compose:
                 ToTensorV2(p=1.0),
             ],
             p=1.0,
+            seed=config.experiment.seed,
         )

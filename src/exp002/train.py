@@ -13,6 +13,7 @@ from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
 from pytorch_lightning.loggers import WandbLogger
 from torch.utils.data import DataLoader
 
+
 import wandb
 from utils import seed_everything
 
@@ -97,7 +98,11 @@ def train_fold(config: DictConfig, df: pd.DataFrame, fold: int) -> None:
         wandb.finish()
 
 
-def main(config_path: Path | None = None, debug: bool = False) -> None:
+def main(
+    config_path: Path | None = None,
+    folds: list[int] = [0, 1, 2, 3, 4],
+    debug: bool = False,
+) -> None:
     """Train model with R2 score monitoring.
     - Trains model per fold with R2 score monitoring
     """
@@ -118,8 +123,13 @@ def main(config_path: Path | None = None, debug: bool = False) -> None:
 
     print(f"Loaded dataset with {len(df)} samples")
 
+    if max(folds) + 1 > config.dataset.n_folds or len(folds) > config.dataset.n_folds:
+        raise ValueError(
+            f"folds must be less than {config.dataset.n_folds} and must be unique"
+        )
+
     # Train folds
-    for fold in range(config.dataset.n_folds):
+    for fold in folds:
         train_fold(config, df, fold)
         if debug:
             break

@@ -162,51 +162,58 @@ def predict(
 
     for batch in tqdm(dataloader, desc=f"Fold {fold}"):
         images = batch.to(device)
-        batch_predictions = []
+        batch_predictions_log = []
 
         if use_amp and device_type == "cuda":
             with torch.no_grad():
                 with torch.amp.autocast(device_type=device_type):
-                    pred, _ = model(images)
-            batch_predictions.append(pred.cpu().detach().numpy())
+                    pred_log, _ = model(images)
+            batch_predictions_log.append(pred_log.cpu().detach())
         else:
             with torch.no_grad():
-                pred, _ = model(images)
-            batch_predictions.append(pred.cpu().detach().numpy())
+                pred_log, _ = model(images)
+            batch_predictions_log.append(pred_log.cpu().detach())
 
         # TTA (Test Time Augmentation)
         if use_tta and use_amp and device_type == "cuda":
             with torch.no_grad():
                 with torch.amp.autocast(device_type=device_type):
                     # Horizontal flip
-                    hflip_pred, _ = model(torch.flip(images, dims=[3]))
-                    batch_predictions.append(hflip_pred.cpu().detach().numpy())
+                    hflip_pred_log, _ = model(torch.flip(images, dims=[3]))
+                    batch_predictions_log.append(hflip_pred_log.cpu().detach())
                     # Vertical flip
-                    vflip_pred, _ = model(torch.flip(images, dims=[2]))
-                    batch_predictions.append(vflip_pred.cpu().detach().numpy())
+                    vflip_pred_log, _ = model(torch.flip(images, dims=[2]))
+                    batch_predictions_log.append(vflip_pred_log.cpu().detach())
                     # Rot90
-                    rot90_pred, _ = model(torch.rot90(images, k=1, dims=[2, 3]))
-                    batch_predictions.append(rot90_pred.cpu().detach().numpy())
+                    rot90_pred_log, _ = model(torch.rot90(images, k=1, dims=[2, 3]))
+                    batch_predictions_log.append(rot90_pred_log.cpu().detach())
                     # Rot270
-                    rot270_pred, _ = model(torch.rot90(images, k=3, dims=[2, 3]))
-                    batch_predictions.append(rot270_pred.cpu().detach().numpy())
+                    rot270_pred_log, _ = model(torch.rot90(images, k=3, dims=[2, 3]))
+                    batch_predictions_log.append(rot270_pred_log.cpu().detach())
         elif use_tta:
             with torch.no_grad():
                 # Horizontal flip
-                hflip_pred, _ = model(torch.flip(images, dims=[3]))
-                batch_predictions.append(hflip_pred.cpu().detach().numpy())
+                hflip_pred_log, _ = model(torch.flip(images, dims=[3]))
+                batch_predictions_log.append(hflip_pred_log.cpu().detach())
                 # Vertical flip
-                vflip_pred, _ = model(torch.flip(images, dims=[2]))
-                batch_predictions.append(vflip_pred.cpu().detach().numpy())
+                vflip_pred_log, _ = model(torch.flip(images, dims=[2]))
+                batch_predictions_log.append(vflip_pred_log.cpu().detach())
                 # Rot90
-                rot90_pred, _ = model(torch.rot90(images, k=1, dims=[2, 3]))
-                batch_predictions.append(rot90_pred.cpu().detach().numpy())
+                rot90_pred_log, _ = model(torch.rot90(images, k=1, dims=[2, 3]))
+                batch_predictions_log.append(rot90_pred_log.cpu().detach())
                 # Rot270
-                rot270_pred, _ = model(torch.rot90(images, k=3, dims=[2, 3]))
-                batch_predictions.append(rot270_pred.cpu().detach().numpy())
+                rot270_pred_log, _ = model(torch.rot90(images, k=3, dims=[2, 3]))
+                batch_predictions_log.append(rot270_pred_log.cpu().detach())
 
-        # Average predictions if TTA is used
-        batch_pred = np.mean(batch_predictions, axis=0)
+        # 各予測を元の空間に戻してから平均（TTA使用時）
+        batch_predictions_original = []
+        for pred_log_tensor in batch_predictions_log:
+            pred_original = torch.expm1(pred_log_tensor)  # 元の空間
+            pred_original = torch.clamp(pred_original, min=0.0)  # 負値除去
+            batch_predictions_original.append(pred_original.numpy())
+
+        # 平均予測
+        batch_pred = np.mean(batch_predictions_original, axis=0)
         fold_predictions.append(batch_pred)
 
     fold_predictions = np.concatenate(fold_predictions, axis=0)
@@ -215,9 +222,9 @@ def predict(
 
 def main(
     test_csv_path: Path = Path("./input/test.csv"),
-    config_path: Path = Path("./config/exp001.yaml"),
-    model_dir: Path = Path("./output/exp001"),
-    output_dir: Path = Path("./output/exp001"),
+    config_path: Path = Path("./config/exp002.yaml"),
+    model_dir: Path = Path("./output/exp002"),
+    output_dir: Path = Path("./output/exp002"),
     folds: list[int] = [0, 1, 2, 3, 4],
     device: str = "auto",
     batch_size: int = 32,

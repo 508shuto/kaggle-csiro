@@ -5,7 +5,6 @@ from pathlib import Path
 
 import pandas as pd
 import pytorch_lightning as L
-import torch
 import tyro
 from dataset import CSIRODataset
 from lightning_module import CSIROModule
@@ -15,6 +14,7 @@ from pytorch_lightning.loggers import WandbLogger
 from torch.utils.data import DataLoader
 
 import wandb
+from utils import seed_everything
 
 
 def train_fold(config: DictConfig, df: pd.DataFrame, fold: int) -> None:
@@ -111,7 +111,7 @@ def main(
         config_path = Path("./config") / f"{exp_name}.yaml"
     config = OmegaConf.load(config_path)
 
-    L.seed_everything(config.experiment.seed)
+    seed_everything(config.experiment.seed)
 
     # Output dir
     config.dataset.output_dir = str(Path(config.dataset.output_dir) / exp_name)
@@ -123,13 +123,16 @@ def main(
     print(f"Loaded dataset with {len(df)} samples")
 
     if max(folds) + 1 > config.dataset.n_folds or len(folds) > config.dataset.n_folds:
-        raise ValueError(f"folds must be less than {config.dataset.n_folds} and must be unique")
+        raise ValueError(
+            f"folds must be less than {config.dataset.n_folds} and must be unique"
+        )
 
     # Train folds
     for fold in folds:
         train_fold(config, df, fold)
         if debug:
             break
+
 
 if __name__ == "__main__":
     tyro.cli(main)

@@ -68,6 +68,7 @@ def create_metadata(df: pd.DataFrame, output_dir: Path) -> pd.DataFrame:
     df = pd.DataFrame(data_items)
     return df
 
+
 def main():
     # Load config
     exp_name = Path(__file__).parent.name
