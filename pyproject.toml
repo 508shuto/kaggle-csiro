@@ -24,6 +24,14 @@ dependencies = [
     "torchvision>=0.24.0",
     "tyro>=0.9.35",
     "wandb>=0.22.3",
+    # exp100: Qwen3-VL dependencies
+    "transformers>=4.51.0",
+    "qwen-vl-utils>=0.0.8",
+    "peft>=0.13.0",
+    "accelerate>=1.2.0",
+    "bitsandbytes>=0.44.0",
+    "einops>=0.8.0",
+    "sentencepiece>=0.2.0",
 ]
 
 [dependency-groups]

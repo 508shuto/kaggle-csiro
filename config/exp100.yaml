@@ -1,0 +1,106 @@
+experiment:
+  name: exp100
+  seed: 42
+  description: "Qwen3-VL fine-tuning with StratifiedGroupKFold for grassland biomass prediction"
+
+dataset:
+  input_dir: ./input
+  output_dir: ./output
+  n_folds: 5
+  shuffle: true
+  fold_strategy: "stratified_group"
+  group_column: "sample_id"
+  stratify_column: "species"
+
+model:
+  name: "Qwen/Qwen3-VL-2B-Instruct"  # or Qwen3-VL-4B-Instruct
+  use_lora: true
+  load_in_4bit: false  # メモリに応じて調整
+  load_in_8bit: false
+  torch_dtype: "bfloat16"  # bfloat16, float16, float32
+
+lora:
+  r: 64
+  lora_alpha: 16
+  target_modules:
+    - q_proj
+    - k_proj
+    - v_proj
+    - o_proj
+    - gate_proj
+    - up_proj
+    - down_proj
+  lora_dropout: 0.05
+  bias: "none"
+  task_type: "CAUSAL_LM"
+
+training:
+  # 基本設定
+  output_dir: ./output/exp100
+  num_train_epochs: 10
+
+  # バッチサイズと勾配累積
+  per_device_train_batch_size: 2  # VLモデルは大きいため小さめ
+  per_device_eval_batch_size: 1
+  gradient_accumulation_steps: 8  # 実質batch_size=16
+
+  # 学習率とスケジューラ
+  learning_rate: 2.0e-5
+  warmup_ratio: 0.1
+  lr_scheduler_type: "cosine"
+
+  # 重み減衰と最適化
+  weight_decay: 1.0e-4
+  adam_beta1: 0.9
+  adam_beta2: 0.999
+  adam_epsilon: 1.0e-8
+  max_grad_norm: 1.0
+
+  # 精度とデバイス
+  bf16: true  # bfloat16推奨
+  fp16: false
+  dataloader_num_workers: 4
+  dataloader_pin_memory: true
+
+  # 評価とロギング
+  evaluation_strategy: "epoch"
+  save_strategy: "epoch"
+  logging_steps: 10
+  save_total_limit: 2
+  load_best_model_at_end: true
+  metric_for_best_model: "weighted_r2"
+  greater_is_better: true
+
+  # Early stopping
+  early_stopping_patience: 3
+
+  # その他
+  remove_unused_columns: false  # 重要：カスタムフィールドを保持
+  report_to: "wandb"  # wandb, tensorboard, none
+  run_name: null  # 自動生成
+  seed: 42
+
+  # Gradient checkpointing（メモリ節約）
+  gradient_checkpointing: false  # 必要に応じて有効化
+
+prompt:
+  template: "default"  # "default", "simple", "concise"
+  max_length: 512
+  max_new_tokens: 128
+
+wandb:
+  project: "kaggle-csiro"
+  entity: null  # Wandbのユーザー名/チーム名
+  tags:
+    - exp100
+    - qwen3-vl
+    - grassland
+    - biomass-prediction
+
+# 重み（メトリクス計算用）
+metric_weights:
+  clover: 0.1
+  dead: 0.1
+  green: 0.1
+  gdm: 0.2
+  total: 0.5
