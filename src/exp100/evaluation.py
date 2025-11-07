@@ -46,7 +46,7 @@ def evaluate_fold(config, fold: int, data_type: str = "valid"):
     ].values
 
     # メトリクスを計算
-    metrics = compute_weighted_r2(predictions, targets)
+    metrics = compute_weighted_r2(targets, predictions)
 
     return metrics
 
@@ -190,7 +190,7 @@ def create_oof_predictions(config):
         ["target_clover", "target_dead", "target_green", "target_gdm", "target_total"]
     ].values
 
-    metrics = compute_weighted_r2(predictions, targets)
+    metrics = compute_weighted_r2(targets, predictions)
     print_metrics(metrics, prefix="OOF")
 
     # メトリクスを保存

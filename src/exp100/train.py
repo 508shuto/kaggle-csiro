@@ -1,6 +1,7 @@
 import os
 import sys
 from pathlib import Path
+from typing import Callable, Dict
 import torch
 import pandas as pd
 import numpy as np
@@ -27,9 +28,16 @@ class RegressionTrainer(Trainer):
     生成テキストから数値を抽出して評価
     """
 
-    def __init__(self, *args, metric_weights=None, **kwargs):
+    def __init__(
+        self,
+        *args,
+        metric_weights: np.ndarray | None = None,
+        parse_fn: Callable[[str], Dict[str, float]] | None = None,
+        **kwargs,
+    ):
         super().__init__(*args, **kwargs)
         self.metric_weights = metric_weights or np.array([0.1, 0.1, 0.1, 0.2, 0.5])
+        self.parse_fn = parse_fn or Qwen3VLForRegression.parse_predictions
 
     def compute_loss(self, model, inputs, return_outputs=False, **kwargs):
         """
@@ -78,7 +86,7 @@ class RegressionTrainer(Trainer):
             for ids in generated_ids:
                 text = self.tokenizer.decode(ids, skip_special_tokens=True)
                 # テキストから数値を抽出
-                parsed = model.parse_predictions(text)
+                parsed = self.parse_fn(text)
                 predictions.append(
                     [
                         parsed["clover"],

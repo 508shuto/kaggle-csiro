@@ -116,7 +116,7 @@ def inference_fold(
             # デコードと解析
             predictions = []
             for ids in generated_ids:
-                text = model.processor.decode(ids, skip_special_tokens=True)
+                text = model.processor.tokenizer.decode(ids, skip_special_tokens=True)
                 parsed = model.parse_predictions(text)
                 predictions.append(
                     [
