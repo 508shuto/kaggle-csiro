@@ -9,6 +9,35 @@ CSIRO牧草評価コンペティション用のリポジトリです。
 uv sync
 ```
 
+## Dockerでの実行
+
+### 前提条件
+
+- DockerとDocker Composeがインストールされていること
+- NVIDIA GPUドライバーとnvidia-container-toolkitがインストールされていること
+- `.env`ファイルに必要な環境変数（`WANDB_API_KEY`, `KAGGLE_USERNAME`, `KAGGLE_KEY`など）が設定されていること
+
+### 起動方法
+
+```bash
+# ビルド＆起動
+docker compose up --build
+
+# バックグラウンド起動
+docker compose up -d
+
+# 停止
+docker compose down
+```
+
+起動後、`http://localhost:8888`でJupyter Labにアクセスできます。
+
+### 注意事項
+
+- コードとデータはボリュームマウントでホストと同期されます
+- 初回ビルド時は依存関係のインストールに時間がかかります
+- GPUが利用可能な場合、自動的にGPUが使用されます
+
 ## Kaggle Notebookでの実行手順
 
 ### 1. 前処理: 画像をnumpy配列に変換

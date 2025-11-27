@@ -1,0 +1,18 @@
+services:
+  app:
+    image: shuto.goya/kaggle-csiro
+    build: .
+    ports:
+      - "8888:8888"
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
