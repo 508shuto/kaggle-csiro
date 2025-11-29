@@ -1,5 +1,8 @@
 import pytorch_lightning as L
 import torch
+import wandb
+import numpy as np
+import matplotlib.pyplot as plt
 from models import CSIROModel
 from omegaconf import DictConfig
 from timm.optim._optim_factory import create_optimizer_v2
@@ -8,7 +11,7 @@ from timm.utils.model_ema import ModelEmaV3
 from torchmetrics import R2Score, MetricCollection
 from metrics import WeightedR2Score, WEIGHTS, CLASS_NAMES
 
-from utils import get_loss_fn, mixup_batch
+from utils import get_loss_fn, mixup_batch, denormalize_image
 
 
 class CSIROModule(L.LightningModule):
@@ -50,6 +53,15 @@ class CSIROModule(L.LightningModule):
         )
         self.mixup_alpha = config.augmentation.train.get("mixup", {}).get("alpha", 0.2)
         self.mixup_prob = config.augmentation.train.get("mixup", {}).get("prob", 0.5)
+
+        # 予測結果のロギング設定
+        self.log_predictions = config.trainer.train.get("log_predictions", True)
+        self.max_log_images = config.trainer.train.get("max_log_images", 16)
+
+        # 検証時の予測結果収集用
+        self._val_images = []
+        self._val_preds = []
+        self._val_targets = []
 
     def forward(self, x):
         return self.model(x)
@@ -107,6 +119,16 @@ class CSIROModule(L.LightningModule):
         self.metrics.update(preds, targets_original)
         self.aux_metrics.update(aux_preds, aux_targets_original)
 
+        # 予測結果をロギング用に収集（最初のmax_log_images枚のみ）
+        if self.log_predictions:
+            current_count = sum(len(imgs) for imgs in self._val_images)
+            if current_count < self.max_log_images:
+                remaining = self.max_log_images - current_count
+                n_samples = min(remaining, image.size(0))
+                self._val_images.append(image[:n_samples].detach().cpu())
+                self._val_preds.append(preds[:n_samples].detach().cpu())
+                self._val_targets.append(targets_original[:n_samples].detach().cpu())
+
         self.log("val_loss", loss, prog_bar=True, on_step=False, on_epoch=True)
         self.log(
             "val_aux_loss",
@@ -145,8 +167,100 @@ class CSIROModule(L.LightningModule):
         if "weighted_r2_score" in metrics:
             self.log("val_score", metrics["weighted_r2_score"])
 
+        # wandbに予測結果をロギング
+        if self.log_predictions and self._val_images and wandb.run is not None:
+            self._log_predictions_to_wandb()
+
         self.metrics.reset()
         self.aux_metrics.reset()
+
+        # 予測結果収集用リストをリセット
+        self._val_images = []
+        self._val_preds = []
+        self._val_targets = []
+
+    def _log_predictions_to_wandb(self):
+        """wandbに予測画像、予測値テーブル、散布図をログ."""
+        # 収集した予測結果を結合
+        all_images = torch.cat(self._val_images, dim=0)  # (N, C, H, W)
+        all_preds = torch.cat(self._val_preds, dim=0)  # (N, 5)
+        all_targets = torch.cat(self._val_targets, dim=0)  # (N, 5)
+
+        n_samples = all_images.size(0)
+
+        # 1. 予測画像と予測値のテーブルを作成
+        columns = ["image"] + [f"pred_{c}" for c in CLASS_NAMES] + [f"true_{c}" for c in CLASS_NAMES] + [f"error_{c}" for c in CLASS_NAMES]
+        table = wandb.Table(columns=columns)
+
+        for i in range(n_samples):
+            # 画像を逆正規化
+            img_array = denormalize_image(all_images[i])
+
+            # 各ターゲットの予測値、実測値、誤差
+            preds_i = all_preds[i].numpy()
+            targets_i = all_targets[i].numpy()
+            errors_i = preds_i - targets_i
+
+            row = [wandb.Image(img_array)]
+            row.extend(preds_i.tolist())
+            row.extend(targets_i.tolist())
+            row.extend(errors_i.tolist())
+            table.add_data(*row)
+
+        wandb.log({"val_predictions": table}, step=self.current_epoch)
+
+        # 2. 各ターゲットごとの散布図（予測 vs 実測）を作成
+        fig, axes = plt.subplots(2, 3, figsize=(15, 10))
+        axes = axes.flatten()
+
+        for i, class_name in enumerate(CLASS_NAMES):
+            ax = axes[i]
+            preds_i = all_preds[:, i].numpy()
+            targets_i = all_targets[:, i].numpy()
+
+            ax.scatter(targets_i, preds_i, alpha=0.6, s=20)
+
+            # 対角線（完璧な予測）
+            max_val = max(targets_i.max(), preds_i.max())
+            min_val = min(targets_i.min(), preds_i.min())
+            ax.plot([min_val, max_val], [min_val, max_val], 'r--', lw=2, label='Perfect')
+
+            ax.set_xlabel(f"True {class_name}")
+            ax.set_ylabel(f"Pred {class_name}")
+            ax.set_title(f"{class_name} (weight={WEIGHTS[i]})")
+            ax.legend()
+            ax.grid(True, alpha=0.3)
+
+        # 6番目のsubplotは使わないので非表示
+        axes[5].axis('off')
+
+        plt.tight_layout()
+        wandb.log({"val_scatter_plots": wandb.Image(fig)}, step=self.current_epoch)
+        plt.close(fig)
+
+        # 3. 誤差分布のヒストグラム
+        fig, axes = plt.subplots(2, 3, figsize=(15, 10))
+        axes = axes.flatten()
+
+        for i, class_name in enumerate(CLASS_NAMES):
+            ax = axes[i]
+            errors_i = (all_preds[:, i] - all_targets[:, i]).numpy()
+
+            ax.hist(errors_i, bins=20, edgecolor='black', alpha=0.7)
+            ax.axvline(x=0, color='r', linestyle='--', lw=2)
+            ax.axvline(x=errors_i.mean(), color='g', linestyle='-', lw=2, label=f'Mean: {errors_i.mean():.2f}')
+
+            ax.set_xlabel(f"Error (Pred - True)")
+            ax.set_ylabel("Count")
+            ax.set_title(f"{class_name} Error Distribution")
+            ax.legend()
+            ax.grid(True, alpha=0.3)
+
+        axes[5].axis('off')
+
+        plt.tight_layout()
+        wandb.log({"val_error_histograms": wandb.Image(fig)}, step=self.current_epoch)
+        plt.close(fig)
 
     def configure_optimizers(self):
         optimizer = create_optimizer_v2(

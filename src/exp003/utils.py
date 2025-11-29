@@ -126,6 +126,27 @@ def get_transforms(mode: str, config: DictConfig) -> A.Compose:
         )
 
 
+def denormalize_image(image: torch.Tensor) -> np.ndarray:
+    """ImageNet正規化を逆変換して可視化可能な画像に戻す.
+
+    Args:
+        image: (C, H, W) 正規化済みテンソル
+
+    Returns:
+        (H, W, C) uint8 numpy配列 (0-255)
+    """
+    mean = torch.tensor([0.485, 0.456, 0.406]).view(3, 1, 1)
+    std = torch.tensor([0.229, 0.224, 0.225]).view(3, 1, 1)
+
+    # 正規化を逆変換
+    image = image.cpu() * std + mean
+    # 0-255にクリップしてuint8に変換
+    image = (image * 255).clamp(0, 255).byte()
+    # (C, H, W) -> (H, W, C)
+    image = image.permute(1, 2, 0).numpy()
+    return image
+
+
 def mixup_batch(
     images: torch.Tensor,
     targets_log: torch.Tensor,

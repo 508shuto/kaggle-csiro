@@ -54,6 +54,8 @@ trainer:
       decay: 0.995
       update_after_step: 0
     use_wandb: true
+    log_predictions: true  # wandbに予測画像・予測値をログ
+    max_log_images: 16  # ログする最大画像枚数
   valid:
     batch_size: 32
     num_workers: 4
