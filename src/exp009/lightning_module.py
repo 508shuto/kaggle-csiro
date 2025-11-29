@@ -1,12 +1,12 @@
 import pytorch_lightning as L
 import torch
+from metrics import CLASS_NAMES, WEIGHTS, WeightedR2Score
 from models import CSIROModel
 from omegaconf import DictConfig
 from timm.optim._optim_factory import create_optimizer_v2
 from timm.scheduler.scheduler_factory import create_scheduler_v2
 from timm.utils.model_ema import ModelEmaV3
-from torchmetrics import R2Score, MetricCollection
-from metrics import WeightedR2Score, WEIGHTS, CLASS_NAMES
+from torchmetrics import MetricCollection, R2Score
 
 from utils import get_loss_fn, mixup_batch
 
@@ -36,9 +36,7 @@ class CSIROModule(L.LightningModule):
         )
 
         # Mixup設定
-        self.mixup_enabled = config.augmentation.train.get("mixup", {}).get(
-            "enabled", False
-        )
+        self.mixup_enabled = config.augmentation.train.get("mixup", {}).get("enabled", False)
         self.mixup_alpha = config.augmentation.train.get("mixup", {}).get("alpha", 0.2)
         self.mixup_prob = config.augmentation.train.get("mixup", {}).get("prob", 0.5)
 

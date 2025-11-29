@@ -16,7 +16,5 @@ class AuxLoss(nn.Module):
         super().__init__()
         self.loss_fn = nn.MSELoss()
 
-    def forward(
-        self, aux_preds: torch.Tensor, aux_targets: torch.Tensor
-    ) -> torch.Tensor:
+    def forward(self, aux_preds: torch.Tensor, aux_targets: torch.Tensor) -> torch.Tensor:
         return self.loss_fn(aux_preds, aux_targets)

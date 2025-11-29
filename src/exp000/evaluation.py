@@ -1,32 +1,31 @@
-import tyro
-from omegaconf import DictConfig, OmegaConf
-import torch
-import pandas as pd
-
-import numpy as np
-from tqdm import tqdm
-from torch.utils.data import DataLoader
-
 import json
 from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import torch
+import tyro
 from dataset import CSIRODataset
 from lightning_module import CSIROModule
 from metrics import compute_metrics
+from omegaconf import DictConfig, OmegaConf
+from torch.utils.data import DataLoader
+from tqdm import tqdm
 
 
 def main(
     model_dir: Path = Path("./output/exp000"),
-    folds: list[int] = [0, 1, 2, 3, 4],
+    folds: list[int] | None = None,
     device: str = "cuda",
 ):
+    if folds is None:
+        folds = [0, 1, 2, 3, 4]
     device = torch.device(device)
     exp_name = Path(__file__).parent.name
     config: DictConfig = OmegaConf.load(f"config/{exp_name}.yaml")
 
     config.dataset.output_dir = str(Path(config.dataset.output_dir) / exp_name)
-    df: pd.DataFrame = pd.read_csv(
-        Path(config.dataset.output_dir) / "preprocessed_train.csv"
-    )
+    df: pd.DataFrame = pd.read_csv(Path(config.dataset.output_dir) / "preprocessed_train.csv")
 
     label_columns = [
         "clover_target",
