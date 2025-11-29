@@ -1,14 +1,15 @@
-import tyro
-from omegaconf import DictConfig, OmegaConf
-import torch
-import pandas as pd
-import torch.nn as nn
-import numpy as np
-from tqdm import tqdm
-from torch.utils.data import DataLoader, Dataset
-
 from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import torch
+import torch.nn as nn
+import tyro
 from lightning_module import CSIROModule
+from omegaconf import DictConfig, OmegaConf
+from torch.utils.data import DataLoader, Dataset
+from tqdm import tqdm
+
 from utils import get_transforms
 
 
@@ -154,11 +155,7 @@ def predict(
         Array of predictions shape (N, 5)
     """
     fold_predictions = []
-    device_type = (
-        "cuda"
-        if device.startswith("cuda")
-        else ("mps" if device.startswith("mps") else "cpu")
-    )
+    device_type = "cuda" if device.startswith("cuda") else ("mps" if device.startswith("mps") else "cpu")
 
     for batch in tqdm(dataloader, desc=f"Fold {fold}"):
         images = batch.to(device)
@@ -225,7 +222,7 @@ def main(
     config_path: Path = Path("./config/exp002.yaml"),
     model_dir: Path = Path("./output/exp002"),
     output_dir: Path = Path("./output/exp002"),
-    folds: list[int] = [0, 1, 2, 3, 4],
+    folds: list[int] | None = None,
     device: str = "auto",
     batch_size: int = 32,
     num_workers: int = 4,
@@ -246,6 +243,8 @@ def main(
         use_amp: Whether to use automatic mixed precision
         use_tta: Whether to use test time augmentation
     """
+    if folds is None:
+        folds = [0, 1, 2, 3, 4]
     config: DictConfig = OmegaConf.load(str(config_path))  # type: ignore
     config.model.pretrained = False
 
@@ -300,9 +299,7 @@ def main(
     # Create submission DataFrame
     submission_df = pd.DataFrame(
         {
-            "sample_id": [
-                f"{sid}__{tname}" for sid, tname in zip(sample_ids, target_names_array)
-            ],
+            "sample_id": [f"{sid}__{tname}" for sid, tname in zip(sample_ids, target_names_array, strict=True)],
             "target": targets,
         }
     )

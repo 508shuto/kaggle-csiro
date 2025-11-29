@@ -110,21 +110,15 @@ class CSIROModel(nn.Module):
             patches: (B, N, C, patch_size, patch_size) where N is number of patches
         """
         B, C, H, W = x.shape
-        assert self.patch_size is not None and self.stride is not None, (
-            "patch_size and stride must be set for MIL mode"
-        )
+        assert self.patch_size is not None and self.stride is not None, "patch_size and stride must be set for MIL mode"
 
         # Unfold: (B, C, H, W) -> (B, C * patch_size * patch_size, num_patches)
-        patches = F.unfold(
-            x, kernel_size=self.patch_size, stride=self.stride
-        )  # (B, C*P*P, N)
+        patches = F.unfold(x, kernel_size=self.patch_size, stride=self.stride)  # (B, C*P*P, N)
 
         # Reshape to (B, N, C, patch_size, patch_size)
         num_patches = patches.shape[2]
         patches = patches.view(B, C, self.patch_size, self.patch_size, num_patches)
-        patches = patches.permute(
-            0, 4, 1, 2, 3
-        ).contiguous()  # (B, N, C, patch_size, patch_size)
+        patches = patches.permute(0, 4, 1, 2, 3).contiguous()  # (B, N, C, patch_size, patch_size)
 
         return patches
 
@@ -153,9 +147,7 @@ class CSIROModel(nn.Module):
             patch_features = self.model(patches_flat)
 
             # グローバル平均プーリングでパッチレベルの特徴を抽出
-            patch_pooled = F.adaptive_avg_pool2d(patch_features, 1).flatten(
-                1
-            )  # (B*N, D)
+            patch_pooled = F.adaptive_avg_pool2d(patch_features, 1).flatten(1)  # (B*N, D)
 
             # バッチ×パッチに戻す: (B, N, D)
             patch_features_bag = patch_pooled.view(B, N, -1)

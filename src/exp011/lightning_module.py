@@ -1,12 +1,12 @@
 import pytorch_lightning as L
 import torch
+from metrics import CLASS_NAMES, WEIGHTS, WeightedR2Score
 from models import CSIROModel
 from omegaconf import DictConfig
 from timm.optim._optim_factory import create_optimizer_v2
 from timm.scheduler.scheduler_factory import create_scheduler_v2
 from timm.utils.model_ema import ModelEmaV3
-from torchmetrics import R2Score, MetricCollection
-from metrics import WeightedR2Score, WEIGHTS, CLASS_NAMES
+from torchmetrics import MetricCollection, R2Score
 
 from utils import get_loss_fn, mixup_batch
 
@@ -28,9 +28,7 @@ class CSIROModule(L.LightningModule):
             **self.config.trainer.train.ema,
         )
         self.loss_fn = get_loss_fn(self.config.loss.params, self.config.loss.name)
-        self.aux_loss_fn = get_loss_fn(
-            self.config.aux_loss.params, self.config.aux_loss.name
-        )
+        self.aux_loss_fn = get_loss_fn(self.config.aux_loss.params, self.config.aux_loss.name)
         self.metrics = MetricCollection(
             {
                 "r2_score": R2Score(multioutput="raw_values"),
@@ -45,9 +43,7 @@ class CSIROModule(L.LightningModule):
         self.aux_weight = config.aux_loss.weight
 
         # Mixup設定
-        self.mixup_enabled = config.augmentation.train.get("mixup", {}).get(
-            "enabled", False
-        )
+        self.mixup_enabled = config.augmentation.train.get("mixup", {}).get("enabled", False)
         self.mixup_alpha = config.augmentation.train.get("mixup", {}).get("alpha", 0.2)
         self.mixup_prob = config.augmentation.train.get("mixup", {}).get("prob", 0.5)
 
@@ -61,16 +57,12 @@ class CSIROModule(L.LightningModule):
 
         # Mixup適用
         if self.mixup_enabled and torch.rand(1).item() < self.mixup_prob:
-            image, targets, aux_targets, lam = mixup_batch(
-                image, targets, aux_targets, alpha=self.mixup_alpha
-            )
+            image, targets, aux_targets, lam = mixup_batch(image, targets, aux_targets, alpha=self.mixup_alpha)
             self.log("train_mixup_lambda", lam, on_step=False, on_epoch=True)
 
         # 対数空間で予測・損失計算
         preds, aux_pred_log = self.model(image)
-        loss = self.loss_fn(preds, targets) + self.aux_weight * self.aux_loss_fn(
-            aux_pred_log, aux_targets
-        )
+        loss = self.loss_fn(preds, targets) + self.aux_weight * self.aux_loss_fn(aux_pred_log, aux_targets)
 
         self.log("train_loss", loss, prog_bar=True, on_step=False, on_epoch=True)
         self.log(
@@ -89,9 +81,7 @@ class CSIROModule(L.LightningModule):
         preds, aux_preds_log = self.model_ema.module(image)  # (B, 5), (B, 2)
 
         # 対数空間でLoss計算
-        loss = self.loss_fn(preds, targets) + self.aux_weight * self.aux_loss_fn(
-            aux_preds_log, aux_targets_log
-        )
+        loss = self.loss_fn(preds, targets) + self.aux_weight * self.aux_loss_fn(aux_preds_log, aux_targets_log)
 
         # 元の空間に戻してメトリクス計算
         aux_preds = torch.expm1(aux_preds_log)
