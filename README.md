@@ -9,6 +9,42 @@ CSIRO牧草評価コンペティション用のリポジトリです。
 uv sync
 ```
 
+## 開発ワークフロー
+
+### コードフォーマットとリント
+
+このプロジェクトでは [Ruff](https://docs.astral.sh/ruff/) を使用してコードのフォーマットとリントを行います。
+
+#### ローカルでの実行
+
+```bash
+# コードをフォーマット
+uv run ruff format .
+
+# リントチェック
+uv run ruff check .
+
+# 自動修正可能な問題を修正
+uv run ruff check --fix .
+```
+
+#### Pre-commit フックのセットアップ
+
+コミット前に自動的にフォーマットとリントを実行するには、pre-commit をセットアップします：
+
+```bash
+# pre-commit のインストール（初回のみ）
+uv pip install pre-commit
+
+# pre-commit フックのインストール
+pre-commit install
+
+# 全ファイルに対して手動実行（オプション）
+pre-commit run --all-files
+```
+
+セットアップ後、コミット時に自動的にフォーマットとリントが実行されます。
+
 ## Dockerでの実行
 
 ### 前提条件
