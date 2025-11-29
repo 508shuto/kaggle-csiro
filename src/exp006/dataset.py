@@ -35,9 +35,7 @@ class CSIRODataset(Dataset):
         target = torch.log1p(target_raw)
 
         # 補助ターゲット log(pre_gshh_ndvi * height_ave_cm)
-        pre_gshh_ndvi_x_height_ave_cm = (
-            row["pre_gshh_ndvi"].item() * row["height_ave_cm"].item()
-        )
+        pre_gshh_ndvi_x_height_ave_cm = row["pre_gshh_ndvi"].item() * row["height_ave_cm"].item()
         aux_target_raw = torch.tensor(
             [
                 pre_gshh_ndvi_x_height_ave_cm,

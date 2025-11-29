@@ -1,13 +1,13 @@
-import streamlit as st
-import pandas as pd
-import numpy as np
 from pathlib import Path
-from PIL import Image
-from typing import Optional, Any
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
-import matplotlib.pyplot as plt
+from typing import Any
+
 import matplotlib.cm as cm
+import numpy as np
+import pandas as pd
+import plotly.graph_objects as go
+import streamlit as st
+from PIL import Image
+from plotly.subplots import make_subplots
 
 # デフォルト設定
 DEFAULT_TRAIN_CSV = "input/train.csv"
@@ -47,11 +47,7 @@ def load_and_preprocess_df(csv_path: str, train_dir: Path) -> pd.DataFrame:
     if "image_path" in df.columns:
         meta_cols.append("image_path")
 
-    meta_df = (
-        df[["image_id"] + meta_cols]
-        .drop_duplicates(subset=["image_id"])
-        .reset_index(drop=True)
-    )
+    meta_df = df[["image_id"] + meta_cols].drop_duplicates(subset=["image_id"]).reset_index(drop=True)
 
     # マージ
     result_df = pivot_df.merge(meta_df, on="image_id", how="left")
@@ -77,9 +73,7 @@ def load_and_preprocess_df(csv_path: str, train_dir: Path) -> pd.DataFrame:
 
     # 日付をパース
     if "sampling_date" in result_df.columns:
-        result_df["sampling_date"] = pd.to_datetime(
-            result_df["sampling_date"], errors="coerce"
-        )
+        result_df["sampling_date"] = pd.to_datetime(result_df["sampling_date"], errors="coerce")
 
     # 型変換
     for col in [
@@ -96,7 +90,7 @@ def load_and_preprocess_df(csv_path: str, train_dir: Path) -> pd.DataFrame:
 
 
 @st.cache_data
-def load_oof_predictions(oof_dir: Path) -> Optional[pd.DataFrame]:
+def load_oof_predictions(oof_dir: Path) -> pd.DataFrame | None:
     """OOF予測値を読み込み、sample_id付与"""
     oof_csv = oof_dir / "oofs.csv"
     preprocessed_csv = oof_dir / "preprocessed_train.csv"
@@ -119,9 +113,7 @@ def load_oof_predictions(oof_dir: Path) -> Optional[pd.DataFrame]:
         oof_df["sample_id"] = preprocessed_df["sample_id"].values[: len(oof_df)]
 
         # カラム名を標準化（pred_プレフィックスを付与）
-        pred_columns = {
-            col: f"pred_{col}" for col in oof_df.columns if col != "sample_id"
-        }
+        pred_columns = {col: f"pred_{col}" for col in oof_df.columns if col != "sample_id"}
         oof_df = oof_df.rename(columns=pred_columns)
 
         return oof_df
@@ -182,9 +174,7 @@ def calculate_hsv_histogram(
     return h_hist, s_hist, v_hist
 
 
-def plot_hsv_histogram(
-    h_hist: np.ndarray, s_hist: np.ndarray, v_hist: np.ndarray
-) -> go.Figure:
+def plot_hsv_histogram(h_hist: np.ndarray, s_hist: np.ndarray, v_hist: np.ndarray) -> go.Figure:
     """HSVヒストグラムをPlotlyで可視化"""
     fig = make_subplots(
         rows=1,
@@ -357,9 +347,7 @@ def main():
     # サイドバー設定
     st.sidebar.header("設定")
 
-    csv_path = st.sidebar.text_input(
-        "CSVパス", value=DEFAULT_TRAIN_CSV, help="train.csvのパス"
-    )
+    csv_path = st.sidebar.text_input("CSVパス", value=DEFAULT_TRAIN_CSV, help="train.csvのパス")
     train_dir_str = st.sidebar.text_input(
         "画像ディレクトリ", value=str(DEFAULT_TRAIN_DIR), help="画像ディレクトリのパス"
     )
@@ -379,18 +367,14 @@ def main():
     # speciesフィルタ
     if "species" in df.columns and df["species"].notna().any():
         species_options = ["すべて"] + sorted(df["species"].dropna().unique().tolist())
-        selected_species = st.sidebar.multiselect(
-            "Species", species_options, default=["すべて"]
-        )
+        selected_species = st.sidebar.multiselect("Species", species_options, default=["すべて"])
         if "すべて" not in selected_species:
             df = df[df["species"].isin(selected_species)]
 
     # stateフィルタ
     if "state" in df.columns and df["state"].notna().any():
         state_options = ["すべて"] + sorted(df["state"].dropna().unique().tolist())
-        selected_state = st.sidebar.multiselect(
-            "State", state_options, default=["すべて"]
-        )
+        selected_state = st.sidebar.multiselect("State", state_options, default=["すべて"])
         if "すべて" not in selected_state:
             df = df[df["state"].isin(selected_state)]
 
@@ -472,26 +456,20 @@ def main():
                     if tcol in df.columns and pcol in df.columns:
                         colname = f"_abs_{tcol}"
                         df[colname] = (
-                            pd.to_numeric(df[pcol], errors="coerce")
-                            - pd.to_numeric(df[tcol], errors="coerce")
+                            pd.to_numeric(df[pcol], errors="coerce") - pd.to_numeric(df[tcol], errors="coerce")
                         ).abs()
                         abs_cols.append(colname)
                 if abs_cols:
                     df["_abs_err_overall"] = df[abs_cols].mean(axis=1, skipna=True)
-                    df = df.sort_values(
-                        "_abs_err_overall", ascending=False, na_position="last"
-                    ).reset_index(drop=True)
+                    df = df.sort_values("_abs_err_overall", ascending=False, na_position="last").reset_index(drop=True)
             else:
                 tcol = f"{sort_key}_target"
                 pcol = f"pred_{tcol}"
                 if tcol in df.columns and pcol in df.columns:
                     df["_abs_err"] = (
-                        pd.to_numeric(df[pcol], errors="coerce")
-                        - pd.to_numeric(df[tcol], errors="coerce")
+                        pd.to_numeric(df[pcol], errors="coerce") - pd.to_numeric(df[tcol], errors="coerce")
                     ).abs()
-                    df = df.sort_values(
-                        "_abs_err", ascending=False, na_position="last"
-                    ).reset_index(drop=True)
+                    df = df.sort_values("_abs_err", ascending=False, na_position="last").reset_index(drop=True)
 
     # ギャラリー設定（右ペインに移動）
     # ページネーションや表示設定は右側で操作
@@ -520,12 +498,10 @@ def main():
                 if st.button(
                     "◀ 前へ",
                     disabled=current_idx <= 0,
-                    width='stretch',
+                    width="stretch",
                     key="main_prev",
                 ):
-                    st.session_state["selected_sample_id"] = df.iloc[current_idx - 1][
-                        "sample_id"
-                    ]
+                    st.session_state["selected_sample_id"] = df.iloc[current_idx - 1]["sample_id"]
                     st.rerun()
             with nav_pos:
                 st.markdown(f"**{current_idx + 1} / {total_count}**")
@@ -533,12 +509,10 @@ def main():
                 if st.button(
                     "次へ ▶",
                     disabled=current_idx >= total_count - 1,
-                    width='stretch',
+                    width="stretch",
                     key="main_next",
                 ):
-                    st.session_state["selected_sample_id"] = df.iloc[current_idx + 1][
-                        "sample_id"
-                    ]
+                    st.session_state["selected_sample_id"] = df.iloc[current_idx + 1]["sample_id"]
                     st.rerun()
 
             main_row = df.iloc[current_idx]
@@ -549,65 +523,49 @@ def main():
 
                     # 植生指数選択ボタン
                     st.markdown("### 🌿 植生指数")
-                    col_btn1, col_btn2, col_btn3, col_btn4, col_btn5, col_btn6 = (
-                        st.columns(6)
-                    )
+                    col_btn1, col_btn2, col_btn3, col_btn4, col_btn5, col_btn6 = st.columns(6)
                     col_btn7, col_btn8, col_btn9, col_btn10 = st.columns(4)
 
-                    selected_index = st.session_state.get(
-                        "selected_vegetation_index", "元画像"
-                    )
+                    selected_index = st.session_state.get("selected_vegetation_index", "元画像")
 
                     with col_btn1:
-                        if st.button(
-                            "元画像", key="btn_original", width='stretch'
-                        ):
+                        if st.button("元画像", key="btn_original", width="stretch"):
                             st.session_state["selected_vegetation_index"] = "元画像"
                             st.rerun()
                     with col_btn2:
-                        if st.button("NDY", key="btn_ndy", width='stretch'):
+                        if st.button("NDY", key="btn_ndy", width="stretch"):
                             st.session_state["selected_vegetation_index"] = "NDY"
                             st.rerun()
                     with col_btn3:
-                        if st.button("NDI", key="btn_ndi", width='stretch'):
+                        if st.button("NDI", key="btn_ndi", width="stretch"):
                             st.session_state["selected_vegetation_index"] = "NDI"
                             st.rerun()
                     with col_btn4:
-                        if st.button("CIVE", key="btn_cive", width='stretch'):
+                        if st.button("CIVE", key="btn_cive", width="stretch"):
                             st.session_state["selected_vegetation_index"] = "CIVE"
                             st.rerun()
                     with col_btn5:
-                        if st.button("ExG", key="btn_exg", width='stretch'):
+                        if st.button("ExG", key="btn_exg", width="stretch"):
                             st.session_state["selected_vegetation_index"] = "ExG"
                             st.rerun()
                     with col_btn6:
-                        if st.button(
-                            "White", key="btn_white", width='stretch'
-                        ):
+                        if st.button("White", key="btn_white", width="stretch"):
                             st.session_state["selected_vegetation_index"] = "White"
                             st.rerun()
                     with col_btn7:
-                        if st.button(
-                            "Yellow(Hue)", key="btn_yellow", width='stretch'
-                        ):
-                            st.session_state["selected_vegetation_index"] = (
-                                "Yellow(Hue)"
-                            )
+                        if st.button("Yellow(Hue)", key="btn_yellow", width="stretch"):
+                            st.session_state["selected_vegetation_index"] = "Yellow(Hue)"
                             st.rerun()
                     with col_btn8:
-                        if st.button("ExY", key="btn_exy", width='stretch'):
+                        if st.button("ExY", key="btn_exy", width="stretch"):
                             st.session_state["selected_vegetation_index"] = "ExY"
                             st.rerun()
                     with col_btn9:
-                        if st.button(
-                            "Brown", key="btn_brown", width='stretch'
-                        ):
+                        if st.button("Brown", key="btn_brown", width="stretch"):
                             st.session_state["selected_vegetation_index"] = "Brown"
                             st.rerun()
                     with col_btn10:
-                        if st.button(
-                            "Dryness", key="btn_dryness", width='stretch'
-                        ):
+                        if st.button("Dryness", key="btn_dryness", width="stretch"):
                             st.session_state["selected_vegetation_index"] = "Dryness"
                             st.rerun()
 
@@ -663,7 +621,7 @@ def main():
                     if selected_index == "元画像":
                         h_hist, s_hist, v_hist = calculate_hsv_histogram(main_img)
                         fig = plot_hsv_histogram(h_hist, s_hist, v_hist)
-                        st.plotly_chart(fig, width='stretch')
+                        st.plotly_chart(fig, width="stretch")
                 except Exception as e:
                     st.error(f"画像読み込みエラー: {e}")
             else:
@@ -683,12 +641,8 @@ def main():
 
                 error_data = []
                 for target_col, pred_col in zip(target_columns, pred_columns):
-                    y_true = pd.to_numeric(
-                        main_row.get(target_col, None), errors="coerce"
-                    )
-                    y_pred = pd.to_numeric(
-                        main_row.get(pred_col, None), errors="coerce"
-                    )
+                    y_true = pd.to_numeric(main_row.get(target_col, None), errors="coerce")
+                    y_pred = pd.to_numeric(main_row.get(pred_col, None), errors="coerce")
                     if pd.notna(y_true) and pd.notna(y_pred):
                         abs_err = abs(float(y_pred) - float(y_true))
                         signed_err = float(y_pred) - float(y_true)
@@ -704,7 +658,7 @@ def main():
 
                 if error_data:
                     error_df = pd.DataFrame(error_data)
-                    st.dataframe(error_df, width='stretch', hide_index=True)
+                    st.dataframe(error_df, width="stretch", hide_index=True)
                 else:
                     st.info("OOF予測値がありません")
 
@@ -789,9 +743,7 @@ def main():
     with col_right:
         # ギャラリー設定
         st.subheader("ギャラリー設定")
-        thumbnail_size = st.slider(
-            "サムネイルサイズ (px)", min_value=64, max_value=256, value=96, step=16
-        )
+        thumbnail_size = st.slider("サムネイルサイズ (px)", min_value=64, max_value=256, value=96, step=16)
         page_size = st.selectbox("ページサイズ", [12, 24, 48, 96], index=0)
         num_cols = st.selectbox("列数", [2, 3, 4, 5], index=2)
 
@@ -800,9 +752,7 @@ def main():
         page = st.session_state.get("current_page", 0)
         navi1, navi2, navi3 = st.columns(3)
         with navi1:
-            if st.button(
-                "◀ 前へ", disabled=page == 0, width='stretch', key="page_prev"
-            ):
+            if st.button("◀ 前へ", disabled=page == 0, width="stretch", key="page_prev"):
                 st.session_state["current_page"] = max(0, page - 1)
                 st.rerun()
         with navi2:
@@ -811,7 +761,7 @@ def main():
             if st.button(
                 "次へ ▶",
                 disabled=page >= total_pages - 1,
-                width='stretch',
+                width="stretch",
                 key="page_next",
             ):
                 st.session_state["current_page"] = min(total_pages - 1, page + 1)
@@ -833,10 +783,7 @@ def main():
                     for idx, (_, row) in enumerate(page_df.iterrows()):
                         col_idx = idx % num_cols
                         with gallery_cols[col_idx]:
-                            if (
-                                row.get("image_path")
-                                and Path(row["image_path"]).exists()
-                            ):
+                            if row.get("image_path") and Path(row["image_path"]).exists():
                                 try:
                                     img = Image.open(row["image_path"])
                                     img.thumbnail(
@@ -851,13 +798,11 @@ def main():
 
                             sample_id = row["sample_id"]
                             is_selected = selected_id == sample_id
-                            button_label = (
-                                f"📌 {sample_id}" if is_selected else sample_id
-                            )
+                            button_label = f"📌 {sample_id}" if is_selected else sample_id
                             if st.button(
                                 button_label,
                                 key=f"gallery_{sample_id}_{idx}",
-                                width='stretch',
+                                width="stretch",
                             ):
                                 st.session_state["selected_sample_id"] = sample_id
                                 st.rerun()
@@ -886,7 +831,7 @@ def main():
                         if st.button(
                             button_label,
                             key=f"gallery_{sample_id}_{idx}",
-                            width='stretch',
+                            width="stretch",
                         ):
                             st.session_state["selected_sample_id"] = sample_id
                             st.rerun()

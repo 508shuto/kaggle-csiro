@@ -6,6 +6,7 @@ from pathlib import Path
 import pandas as pd
 import pytorch_lightning as L
 import tyro
+import wandb
 from dataset import CSIRODataset
 from lightning_module import CSIROModule
 from omegaconf import DictConfig, OmegaConf
@@ -13,8 +14,6 @@ from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
 from pytorch_lightning.loggers import WandbLogger
 from torch.utils.data import DataLoader
 
-
-import wandb
 from utils import seed_everything
 
 
@@ -100,12 +99,14 @@ def train_fold(config: DictConfig, df: pd.DataFrame, fold: int) -> None:
 
 def main(
     config_path: Path | None = None,
-    folds: list[int] = [0, 1, 2, 3, 4],
+    folds: list[int] | None = None,
     debug: bool = False,
 ) -> None:
     """Train model with R2 score monitoring.
     - Trains model per fold with R2 score monitoring
     """
+    if folds is None:
+        folds = [0, 1, 2, 3, 4]
     # Derive default config path from experiment directory name
     exp_name: str = Path(__file__).parent.name  # exp000
     if config_path is None:
@@ -124,9 +125,7 @@ def main(
     print(f"Loaded dataset with {len(df)} samples")
 
     if max(folds) + 1 > config.dataset.n_folds or len(folds) > config.dataset.n_folds:
-        raise ValueError(
-            f"folds must be less than {config.dataset.n_folds} and must be unique"
-        )
+        raise ValueError(f"folds must be less than {config.dataset.n_folds} and must be unique")
 
     # Train folds
     for fold in folds:

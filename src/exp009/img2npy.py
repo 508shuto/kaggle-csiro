@@ -1,15 +1,14 @@
 import os
-import tyro
-from pathlib import Path
-from PIL import Image
-import numpy as np
-from tqdm import tqdm
 from concurrent.futures import ProcessPoolExecutor, as_completed
+from pathlib import Path
+
+import numpy as np
+import tyro
+from PIL import Image
+from tqdm import tqdm
 
 
-def process_one_image(
-    file_path: Path, output_dir: Path, image_size: int
-) -> tuple[Path, bool]:
+def process_one_image(file_path: Path, output_dir: Path, image_size: int) -> tuple[Path, bool]:
     """Process a single image and save as numpy array.
 
     Args:
@@ -62,13 +61,8 @@ def main(
     success_count = 0
     fail_count = 0
     with ProcessPoolExecutor(max_workers=num_workers) as executor:
-        futures = [
-            executor.submit(process_one_image, file_path, output_dir, image_size)
-            for file_path in image_files
-        ]
-        for future in tqdm(
-            as_completed(futures), total=len(futures), desc="Converting images"
-        ):
+        futures = [executor.submit(process_one_image, file_path, output_dir, image_size) for file_path in image_files]
+        for future in tqdm(as_completed(futures), total=len(futures), desc="Converting images"):
             _, success = future.result()
             if success:
                 success_count += 1

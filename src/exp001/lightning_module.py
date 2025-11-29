@@ -1,12 +1,12 @@
 import pytorch_lightning as L
 import torch
+from metrics import CLASS_NAMES, WEIGHTS, WeightedR2Score
 from models import CSIROModel
 from omegaconf import DictConfig
 from timm.optim._optim_factory import create_optimizer_v2
 from timm.scheduler.scheduler_factory import create_scheduler_v2
 from timm.utils.model_ema import ModelEmaV3
-from torchmetrics import R2Score, MetricCollection
-from metrics import WeightedR2Score, WEIGHTS, CLASS_NAMES
+from torchmetrics import MetricCollection, R2Score
 
 from utils import get_loss_fn
 
@@ -28,9 +28,7 @@ class CSIROModule(L.LightningModule):
             **self.config.trainer.train.ema,
         )
         self.loss_fn = get_loss_fn(self.config.loss.params, self.config.loss.name)
-        self.aux_loss_fn = get_loss_fn(
-            self.config.aux_loss.params, self.config.aux_loss.name
-        )
+        self.aux_loss_fn = get_loss_fn(self.config.aux_loss.params, self.config.aux_loss.name)
         self.metrics = MetricCollection(
             {
                 "r2_score": R2Score(multioutput="raw_values"),
@@ -58,9 +56,7 @@ class CSIROModule(L.LightningModule):
         # TODO: implement mixup
         image, targets, aux_targets = batch
         pred, aux_pred = self.model(image)
-        loss = self.loss_fn(pred, targets) + self.aux_weight * self.aux_loss_fn(
-            aux_pred, aux_targets
-        )
+        loss = self.loss_fn(pred, targets) + self.aux_weight * self.aux_loss_fn(aux_pred, aux_targets)
         self.log("train_loss", loss, prog_bar=True, on_step=False, on_epoch=True)
         self.log(
             "train_aux_loss",
@@ -75,9 +71,7 @@ class CSIROModule(L.LightningModule):
         image, targets, aux_targets = batch
         preds, aux_preds = self.model_ema.module(image)  # (B, 5)
 
-        loss = self.loss_fn(preds, targets) + self.aux_weight * self.aux_loss_fn(
-            aux_preds, aux_targets
-        )
+        loss = self.loss_fn(preds, targets) + self.aux_weight * self.aux_loss_fn(aux_preds, aux_targets)
 
         # TODO: inverse log1p transform
         self.metrics.update(preds, targets)
