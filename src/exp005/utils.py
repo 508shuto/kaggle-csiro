@@ -1,20 +1,21 @@
+import os
+import random
+
 import albumentations as A
 import numpy as np
+import pytorch_lightning as L
 import torch
 import torch.nn as nn
 from albumentations.pytorch import ToTensorV2
 from loss import (
-    WeightedMSELoss,
-    WeightedHuberLoss,
     AuxLoss,
+    WeightedHuberLoss,
+    WeightedMSELoss,
 )
 from metrics import (
     WeightedR2Score,
 )
 from omegaconf import DictConfig
-import pytorch_lightning as L
-import random
-import os
 
 
 def seed_everything(seed: int):
@@ -67,13 +68,9 @@ def get_transforms(mode: str, config: DictConfig) -> A.Compose:
             )
         ]
         if config.augmentation.train.horizontal_flip > 0:
-            augmentations.append(
-                A.HorizontalFlip(p=config.augmentation.train.horizontal_flip)
-            )
+            augmentations.append(A.HorizontalFlip(p=config.augmentation.train.horizontal_flip))
         if config.augmentation.train.vertical_flip > 0:
-            augmentations.append(
-                A.VerticalFlip(p=config.augmentation.train.vertical_flip)
-            )
+            augmentations.append(A.VerticalFlip(p=config.augmentation.train.vertical_flip))
         if config.augmentation.train.rotation_limit > 0:
             augmentations.append(
                 A.Rotate(

@@ -36,12 +36,8 @@ class WeightedR2Score(Metric):
             default=torch.zeros(len(WEIGHTS)),
             dist_reduce_fx="sum",
         )
-        self.add_state(
-            "sum_squared_total", default=torch.zeros(len(WEIGHTS)), dist_reduce_fx="sum"
-        )
-        self.add_state(
-            "sum_targets", default=torch.zeros(len(WEIGHTS)), dist_reduce_fx="sum"
-        )
+        self.add_state("sum_squared_total", default=torch.zeros(len(WEIGHTS)), dist_reduce_fx="sum")
+        self.add_state("sum_targets", default=torch.zeros(len(WEIGHTS)), dist_reduce_fx="sum")
         self.add_state("total_samples", default=torch.tensor(0.0), dist_reduce_fx="sum")
 
     def update(self, preds: torch.Tensor, targets: torch.Tensor) -> None:
@@ -52,17 +48,13 @@ class WeightedR2Score(Metric):
             targets: Targets tensor of shape (batch_size, num_classes)
         """
         if preds.shape != targets.shape:
-            raise ValueError(
-                f"Shape mismatch: preds {preds.shape} != targets {targets.shape}"
-            )
+            raise ValueError(f"Shape mismatch: preds {preds.shape} != targets {targets.shape}")
 
         batch_size = preds.shape[0]
         num_classes = preds.shape[1]
 
         if num_classes != len(WEIGHTS):
-            raise ValueError(
-                f"Number of classes {num_classes} != number of weights {len(WEIGHTS)}"
-            )
+            raise ValueError(f"Number of classes {num_classes} != number of weights {len(WEIGHTS)}")
 
         # Calculate residuals: (y_true - y_pred)² for each class
         residuals = (targets - preds) ** 2  # (batch_size, num_classes)
@@ -100,9 +92,7 @@ class WeightedR2Score(Metric):
 
         # Calculate SS_tot (total sum of squares)
         # SS_tot = Σ(y_true - y_mean)² = Σ(y_true²) - n * y_mean²
-        ss_tot = (
-            self.sum_squared_total - self.total_samples * mean_targets**2
-        )  # (num_classes,)
+        ss_tot = self.sum_squared_total - self.total_samples * mean_targets**2  # (num_classes,)
 
         # Avoid division by zero
         eps = 1e-8
