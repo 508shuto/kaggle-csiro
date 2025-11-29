@@ -17,9 +17,7 @@ class WeightedSmoothL1Loss(nn.Module):
         self.weight = torch.tensor([0.1, 0.1, 0.1, 0.2, 0.5])
 
     def forward(self, preds: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
-        return torch.mean(
-            self.weight.to(preds.device) * nn.SmoothL1Loss()(preds, targets)
-        )
+        return torch.mean(self.weight.to(preds.device) * nn.SmoothL1Loss()(preds, targets))
 
 
 class AuxLoss(nn.Module):
@@ -27,7 +25,5 @@ class AuxLoss(nn.Module):
         super().__init__()
         self.loss_fn = nn.MSELoss()
 
-    def forward(
-        self, aux_preds: torch.Tensor, aux_targets: torch.Tensor
-    ) -> torch.Tensor:
+    def forward(self, aux_preds: torch.Tensor, aux_targets: torch.Tensor) -> torch.Tensor:
         return self.loss_fn(aux_preds, aux_targets)

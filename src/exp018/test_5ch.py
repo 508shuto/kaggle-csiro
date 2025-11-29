@@ -3,13 +3,12 @@
 import sys
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 import torch
-from omegaconf import DictConfig, OmegaConf
-
 from dataset import CSIRODataset
 from models import CSIROModel
+from omegaconf import DictConfig, OmegaConf
+
 from utils import get_transforms
 
 # Add parent directory to path
@@ -33,7 +32,7 @@ print(f"Config model.in_channels: {config.model.in_channels}")
 
 # Test transforms
 transform = get_transforms("train", config)
-print(f"\nTransform created successfully")
+print("\nTransform created successfully")
 
 # Test dataset
 train_df = df[df["fold"] != 0].head(2).reset_index(drop=True)
@@ -45,7 +44,7 @@ print(f"\nDataset created with {len(dataset)} samples")
 sample_image, sample_target, sample_aux = dataset[0]
 
 print(f"\nImage shape: {sample_image.shape}")
-print(f"Expected: torch.Size([5, 256, 256])")
+print("Expected: torch.Size([5, 256, 256])")
 print(f"Target shape: {sample_target.shape}")
 print(f"Aux target shape: {sample_aux.shape}")
 
@@ -58,7 +57,7 @@ else:
 
 # Check value ranges
 print(f"\nImage value range: [{sample_image.min():.4f}, {sample_image.max():.4f}]")
-print(f"Expected: RGB normalized, NDI/ExG centered around 0")
+print("Expected: RGB normalized, NDI/ExG centered around 0")
 
 # Test model
 model = CSIROModel(
@@ -78,7 +77,7 @@ with torch.no_grad():
 
 print(f"Prediction shape: {pred_log.shape}")
 print(f"Aux prediction shape: {aux_pred_log.shape}")
-print(f"Expected: torch.Size([1, 5]) and torch.Size([1, 2])")
+print("Expected: torch.Size([1, 5]) and torch.Size([1, 2])")
 
 # Check for NaN in predictions
 if torch.isnan(pred_log).any() or torch.isnan(aux_pred_log).any():
