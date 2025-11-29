@@ -6,6 +6,7 @@ from pathlib import Path
 import pandas as pd
 import pytorch_lightning as L
 import tyro
+import wandb
 from dataset import CSIRODataset
 from lightning_module import CSIROModule
 from omegaconf import DictConfig, OmegaConf
@@ -13,7 +14,6 @@ from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
 from pytorch_lightning.loggers import WandbLogger
 from torch.utils.data import DataLoader
 
-import wandb
 from utils import seed_everything
 
 
