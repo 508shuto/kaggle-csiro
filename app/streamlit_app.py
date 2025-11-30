@@ -1,7 +1,9 @@
+import json
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-import matplotlib.cm as cm
+import matplotlib
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
@@ -12,6 +14,7 @@ from plotly.subplots import make_subplots
 # デフォルト設定
 DEFAULT_TRAIN_CSV = "input/train.csv"
 DEFAULT_TRAIN_DIR = Path("input/train")
+NOTES_FILE = Path("output/notes.json")
 
 # ターゲット名のマッピング
 TARGET_MAPPING = {
@@ -74,6 +77,10 @@ def load_and_preprocess_df(csv_path: str, train_dir: Path) -> pd.DataFrame:
     # 日付をパース
     if "sampling_date" in result_df.columns:
         result_df["sampling_date"] = pd.to_datetime(result_df["sampling_date"], errors="coerce")
+        # 文字列形式のカテゴリ列を追加（YYYY/MM/DD形式）
+        result_df["sampling_date_str"] = result_df["sampling_date"].dt.strftime("%Y/%m/%d")
+        # 欠損値の場合は空文字列に変換
+        result_df["sampling_date_str"] = result_df["sampling_date_str"].fillna("")
 
     # 型変換
     for col in [
@@ -120,6 +127,39 @@ def load_oof_predictions(oof_dir: Path) -> pd.DataFrame | None:
     except Exception as e:
         st.error(f"OOF読み込みエラー: {e}")
         return None
+
+
+def load_notes() -> dict[str, dict[str, str]]:
+    """メモファイルから全メモを読み込み"""
+    if not NOTES_FILE.exists():
+        return {}
+    try:
+        with open(NOTES_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def save_note(sample_id: str, content: str) -> None:
+    """メモを保存"""
+    notes = load_notes()
+    notes[sample_id] = {
+        "content": content,
+        "updated_at": datetime.now().isoformat(),
+    }
+    NOTES_FILE.parent.mkdir(parents=True, exist_ok=True)
+    with open(NOTES_FILE, "w", encoding="utf-8") as f:
+        json.dump(notes, f, ensure_ascii=False, indent=2)
+
+
+def delete_note(sample_id: str) -> None:
+    """メモを削除"""
+    notes = load_notes()
+    if sample_id in notes:
+        del notes[sample_id]
+        NOTES_FILE.parent.mkdir(parents=True, exist_ok=True)
+        with open(NOTES_FILE, "w", encoding="utf-8") as f:
+            json.dump(notes, f, ensure_ascii=False, indent=2)
 
 
 def calculate_derived_values(row: pd.Series) -> dict[str, float]:
@@ -296,6 +336,26 @@ def calculate_whiteness(rgb_array: np.ndarray) -> np.ndarray:
     return whiteness
 
 
+def calculate_brownness(rgb_array: np.ndarray) -> np.ndarray:
+    """Brownness: 茶色の色相範囲を検出（HSVのHueで20-40度付近を強調）"""
+    hsv_img = Image.fromarray(rgb_array).convert("HSV")
+    hsv = np.array(hsv_img).astype(np.float32)
+    h = hsv[:, :, 0] * (360.0 / 255.0)
+    s = hsv[:, :, 1] / 255.0
+    v = hsv[:, :, 2] / 255.0
+
+    # 茶色の色相範囲（20-40度）を検出
+    brown_center = 30.0
+    brown_sigma = 10.0
+    delta = np.abs(h - brown_center)
+    delta = np.minimum(delta, 360.0 - delta)
+    brown_weight = np.exp(-((delta / brown_sigma) ** 2))
+
+    # SとVで重み付け
+    brownness = brown_weight * s * v
+    return brownness.astype(np.float32)
+
+
 def calculate_dryness(rgb_array: np.ndarray) -> np.ndarray:
     """Dryness = 0.6 * Yellow(Hue) + 0.4 * Brownness(正規化)"""
     yellow = calculate_yellow_hue(rgb_array)
@@ -326,7 +386,7 @@ def visualize_index(index_array: np.ndarray, colormap: str = "viridis") -> Image
     scaled = (normalized * 255).astype(np.uint8)
 
     # matplotlibのカラーマップを使用
-    cmap = cm.get_cmap(colormap)
+    cmap = matplotlib.colormaps[colormap]
     colored = cmap(scaled / 255.0)
 
     # RGBAからRGBに変換（alphaチャンネルを削除）
@@ -378,10 +438,24 @@ def main():
         if "すべて" not in selected_state:
             df = df[df["state"].isin(selected_state)]
 
+    # Sampling Dateフィルタ（カテゴリ選択）
+    if "sampling_date_str" in df.columns and df["sampling_date_str"].notna().any():
+        date_options = ["すべて"] + sorted(df["sampling_date_str"].dropna().unique().tolist())
+        selected_dates = st.sidebar.multiselect("Sampling Date", date_options, default=["すべて"])
+        if "すべて" not in selected_dates:
+            df = df[df["sampling_date_str"].isin(selected_dates)]
+
     # sample_id検索
     search_query = st.sidebar.text_input("Sample ID検索", value="")
     if search_query:
         df = df[df["sample_id"].str.contains(search_query, case=False, na=False)]
+
+    # メモ付き画像フィルタ
+    notes = load_notes()
+    show_only_with_notes = st.sidebar.checkbox("メモ付きのみ表示", value=False)
+    if show_only_with_notes:
+        notes_sample_ids = set(notes.keys())
+        df = df[df["sample_id"].isin(notes_sample_ids)]
 
     # Sampling Dateでソート（昇順）
     if "sampling_date" in df.columns:
@@ -681,6 +755,41 @@ def main():
 
             st.json(metadata)
 
+            # メモセクション
+            st.markdown("### 📝 メモ")
+            notes = load_notes()
+            current_note = notes.get(selected_id, {}).get("content", "")
+            note_content = st.text_area(
+                "メモを入力",
+                value=current_note,
+                height=100,
+                key=f"memo_{selected_id}",
+                help="この画像に関するメモを入力できます",
+            )
+            col_save, col_delete = st.columns(2)
+            with col_save:
+                if st.button("💾 保存", key=f"save_memo_{selected_id}", width="stretch"):
+                    if note_content.strip():
+                        save_note(selected_id, note_content.strip())
+                        st.success("メモを保存しました")
+                        st.rerun()
+                    else:
+                        st.warning("メモが空です")
+            with col_delete:
+                if st.button("🗑️ 削除", key=f"delete_memo_{selected_id}", width="stretch"):
+                    if selected_id in notes:
+                        delete_note(selected_id)
+                        st.success("メモを削除しました")
+                        st.rerun()
+                    else:
+                        st.info("メモがありません")
+
+            # 保存済みメモの表示
+            if selected_id in notes:
+                note_info = notes[selected_id]
+                updated_at = note_info.get("updated_at", "")
+                st.info(f"📌 最終更新: {updated_at}")
+
             # ターゲット値表示（メインビュー下）
             st.markdown("### 🎯 ターゲット値")
             targets: dict[str, float] = {}
@@ -806,6 +915,14 @@ def main():
                             ):
                                 st.session_state["selected_sample_id"] = sample_id
                                 st.rerun()
+                            # Sample IDボタンの下にSampling Dateを表示
+                            if (
+                                "sampling_date_str" in row
+                                and pd.notna(row["sampling_date_str"])
+                                and row["sampling_date_str"] != ""
+                            ):
+                                date_str = row["sampling_date_str"]
+                                st.caption(f"📅 {date_str}")
             except TypeError:
                 # height未対応バージョンのフォールバック
                 gallery_cols = st.columns(num_cols)
@@ -835,6 +952,14 @@ def main():
                         ):
                             st.session_state["selected_sample_id"] = sample_id
                             st.rerun()
+                        # Sample IDボタンの下にSampling Dateを表示
+                        if (
+                            "sampling_date_str" in row
+                            and pd.notna(row["sampling_date_str"])
+                            and row["sampling_date_str"] != ""
+                        ):
+                            date_str = row["sampling_date_str"]
+                            st.caption(f"📅 {date_str}")
 
     # 右ペインはギャラリー専用
 
