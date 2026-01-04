@@ -186,11 +186,13 @@ class CSIROModule(L.LightningModule):
         updates_per_epoch = self._get_steps_per_epoch()
 
         scheduler_config = dict(self.config.trainer.train.scheduler)
+        warmup_epochs = self.config.trainer.train.get("warmup_epochs", 0)
 
         scheduler, _ = create_scheduler_v2(
             optimizer=optimizer,
             num_epochs=self.config.trainer.train.epochs,
-            warmup_lr=0,
+            warmup_epochs=warmup_epochs,
+            warmup_lr=1e-6,  # Start from low LR
             **scheduler_config,
             step_on_epochs=False,
             updates_per_epoch=updates_per_epoch,
