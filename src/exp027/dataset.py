@@ -64,7 +64,10 @@ class CSIRODataset(Dataset):
     def __getitem__(self, idx: int) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         row = self.df.iloc[idx]
         # Load image with PIL
-        image = Image.open(row["image_path"]).convert("RGB")
+        try:
+            image = Image.open(row["image_path"]).convert("RGB")
+        except (FileNotFoundError, OSError) as e:
+            raise RuntimeError(f"Failed to load image {row['image_path']}: {e}") from e
 
         # Apply transforms
         image = self.transform(image)
@@ -72,11 +75,11 @@ class CSIRODataset(Dataset):
         # Get raw target values
         target = torch.tensor(
             [
-                row["clover_target"].item() if hasattr(row["clover_target"], "item") else row["clover_target"],
-                row["dead_target"].item() if hasattr(row["dead_target"], "item") else row["dead_target"],
-                row["green_target"].item() if hasattr(row["green_target"], "item") else row["green_target"],
-                row["gdm_target"].item() if hasattr(row["gdm_target"], "item") else row["gdm_target"],
-                row["total_target"].item() if hasattr(row["total_target"], "item") else row["total_target"],
+                float(row["clover_target"]),
+                float(row["dead_target"]),
+                float(row["green_target"]),
+                float(row["gdm_target"]),
+                float(row["total_target"]),
             ],
             dtype=torch.float32,
         )
@@ -84,8 +87,8 @@ class CSIRODataset(Dataset):
         # Auxiliary targets
         aux_target = torch.tensor(
             [
-                row["pre_gshh_ndvi"].item() if hasattr(row["pre_gshh_ndvi"], "item") else row["pre_gshh_ndvi"],
-                row["height_ave_cm"].item() if hasattr(row["height_ave_cm"], "item") else row["height_ave_cm"],
+                float(row["pre_gshh_ndvi"]),
+                float(row["height_ave_cm"]),
             ],
             dtype=torch.float32,
         )
