@@ -30,12 +30,14 @@ class CSIROModule(L.LightningModule):
             self.model,
             **self.config.trainer.train.ema,
         )
-        self.loss_fn = get_loss_fn(self.config.loss.params, self.config.loss.name)
-        self.aux_loss_fn = get_loss_fn(self.config.aux_loss.params, self.config.aux_loss.name)
+        self.loss_fn = get_loss_fn(self.config.loss, self.config.loss.name)
+        self.aux_loss_fn = get_loss_fn(self.config.aux_loss, self.config.aux_loss.name)
+        # Get weights from config for metrics
+        weights = self.config.loss.get("weights", None)
         self.metrics = MetricCollection(
             {
                 "r2_score": R2Score(multioutput="raw_values"),
-                "weighted_r2_score": WeightedR2Score(),
+                "weighted_r2_score": WeightedR2Score(weights=weights),
             }
         )
         self.aux_metrics = MetricCollection(

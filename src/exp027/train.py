@@ -108,7 +108,7 @@ def main(
     if folds is None:
         folds = [0, 1, 2, 3, 4]
     # Derive default config path from experiment directory name
-    exp_name: str = Path(__file__).parent.name  # exp026
+    exp_name: str = Path(__file__).parent.name  # exp027
     if config_path is None:
         config_path = Path("./config") / f"{exp_name}.yaml"
     config = OmegaConf.load(config_path)

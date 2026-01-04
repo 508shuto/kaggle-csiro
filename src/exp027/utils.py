@@ -37,10 +37,13 @@ def get_device() -> torch.device:
 
 
 def get_loss_fn(params: DictConfig, loss_name: str) -> nn.Module:
+    # Extract weights from config if available
+    weights = params.get("weights", None)
+
     if loss_name == "l2_loss":
-        return WeightedMSELoss()
+        return WeightedMSELoss(weights=weights)
     elif loss_name == "smooth_l1_loss":
-        return WeightedSmoothL1Loss()
+        return WeightedSmoothL1Loss(weights=weights)
     elif loss_name == "aux_loss":
         return AuxLoss()
     else:
@@ -48,8 +51,11 @@ def get_loss_fn(params: DictConfig, loss_name: str) -> nn.Module:
 
 
 def get_metrics(params: DictConfig, metrics_name: str) -> nn.Module:
+    # Extract weights from config if available
+    weights = params.get("weights", None)
+
     if metrics_name == "r2_score":
-        return WeightedR2Score()
+        return WeightedR2Score(weights=weights)
     else:
         raise ValueError(f"Metrics {metrics_name} not found")
 

@@ -19,6 +19,7 @@ model:
 loss:
   name: "smooth_l1_loss"
   params: {}
+  weights: [0.1, 0.1, 0.1, 0.2, 0.5]  # [Clover, Dead, Green, GDM, Total]
 
 aux_loss:
   name: "aux_loss"

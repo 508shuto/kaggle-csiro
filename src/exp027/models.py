@@ -25,16 +25,10 @@ class Qwen3VLRegressionModel(nn.Module):
 
         # Load Qwen3-VL model
         if pretrained:
-            # Determine appropriate dtype based on device capabilities
-            # bf16 is only supported on CUDA devices with compute capability >= 8.0
-            if torch.cuda.is_available() and torch.cuda.is_bf16_supported():
-                dtype = torch.bfloat16
-            else:
-                dtype = torch.float32
-
+            # Load in float32 and let PyTorch Lightning handle mixed precision
             self.vlm = Qwen3VLForConditionalGeneration.from_pretrained(
                 model_name,
-                torch_dtype=dtype,
+                torch_dtype=torch.float32,
                 device_map=None,  # Manual device placement
             )
         else:
@@ -113,18 +107,11 @@ class Qwen3VLRegressionModel(nn.Module):
             grid_thw = torch.tensor([[1, h, w]] * batch_size, device=pixel_values.device)
 
         # Extract vision features
-        # Use torch.no_grad() when backbone is frozen, otherwise allow gradients during training
-        if self.freeze_backbone:
-            with torch.no_grad():
-                vision_outputs = self.vision_encoder(
-                    pixel_values=pixel_values,
-                    grid_thw=grid_thw,
-                )
-        else:
-            vision_outputs = self.vision_encoder(
-                pixel_values=pixel_values,
-                grid_thw=grid_thw,
-            )
+        # PyTorch automatically skips gradient computation for frozen parameters
+        vision_outputs = self.vision_encoder(
+            pixel_values=pixel_values,
+            grid_thw=grid_thw,
+        )
 
         # Get hidden states: shape (total_patches, hidden_dim)
         hidden_states = vision_outputs.last_hidden_state
@@ -135,14 +122,17 @@ class Qwen3VLRegressionModel(nn.Module):
         if hidden_states.dim() == 2:
             # Shape: (total_patches, hidden_dim) - need to reshape per batch
             # Use grid_thw to determine batch boundaries
+            # Compute num_patches on GPU to avoid CPU transfers
+            num_patches_per_batch = grid_thw[:, 0] * grid_thw[:, 1] * grid_thw[:, 2]  # (B,)
+
+            # Use tensor operations to split and pool
             features = []
             start_idx = 0
-            for i in range(grid_thw.shape[0]):
-                t, h, w = grid_thw[i].tolist()
-                num_patches = int(t * h * w)
-                batch_hidden = hidden_states[start_idx : start_idx + num_patches]
+            for num_patches in num_patches_per_batch:
+                end_idx = start_idx + num_patches
+                batch_hidden = hidden_states[start_idx:end_idx]
                 features.append(batch_hidden.mean(dim=0))
-                start_idx += num_patches
+                start_idx = end_idx
             pooled = torch.stack(features, dim=0)  # (B, hidden_dim)
         else:
             # Shape: (B, seq_len, hidden_dim)
