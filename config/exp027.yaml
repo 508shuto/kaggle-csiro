@@ -27,8 +27,6 @@ aux_loss:
 
 trainer:
   train:
-    lr: 1e-4
-    weight_decay: 1e-4
     epochs: 100
     warmup_epochs: 5
     batch_size: 8  # Smaller batch size for VLM
@@ -70,13 +68,7 @@ augmentation:
     horizontal_flip: 0.5
     vertical_flip: 0.5
     rotation_limit: 20
-    shift_limit: 0.1
-    scale_limit: 0.2
-    elastic_transform: false  # Disable for VLM
     brightness_contrast: true
-    gamma_transform: false
-    gaussian_noise: false
-    blur: false
     mixup:
       enabled: true
       alpha: 0.2

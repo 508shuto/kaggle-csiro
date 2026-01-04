@@ -116,7 +116,11 @@ def predict_fold(
         persistent_workers=num_workers > 0,
     )
 
-    model_path = list(model_dir.glob(f"fold{fold}*.ckpt"))[0]
+    checkpoints = list(model_dir.glob(f"fold{fold}*.ckpt"))
+    if not checkpoints:
+        raise FileNotFoundError(f"No checkpoint found for fold {fold} in {model_dir}")
+    model_path = checkpoints[0]
+
     # Use torch.device for map_location to avoid MPS issues
     map_location = torch.device(device)
     model = (
