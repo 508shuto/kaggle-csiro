@@ -25,9 +25,16 @@ class Qwen3VLRegressionModel(nn.Module):
 
         # Load Qwen3-VL model
         if pretrained:
+            # Determine appropriate dtype based on device capabilities
+            # bf16 is only supported on CUDA devices with compute capability >= 8.0
+            if torch.cuda.is_available() and torch.cuda.is_bf16_supported():
+                dtype = torch.bfloat16
+            else:
+                dtype = torch.float32
+
             self.vlm = Qwen3VLForConditionalGeneration.from_pretrained(
                 model_name,
-                torch_dtype=torch.bfloat16,
+                torch_dtype=dtype,
                 device_map=None,  # Manual device placement
             )
         else:
@@ -44,8 +51,17 @@ class Qwen3VLRegressionModel(nn.Module):
             for param in self.vision_encoder.parameters():
                 param.requires_grad = False
 
+        # Validate hidden dimension matches vision encoder output
+        actual_hidden_dim = self.vision_encoder.config.hidden_size
+        assert (
+            hidden_dim == actual_hidden_dim
+        ), f"Config hidden_dim ({hidden_dim}) must match Qwen3-VL output ({actual_hidden_dim})"
+
         # Get hidden dimension from vision encoder
         self.hidden_dim = hidden_dim
+
+        # Store patch size for grid calculation
+        self.patch_size = self.vision_encoder.config.patch_size
 
         # Regression head for main targets (predicts 3: clover, dead, green)
         self.head = nn.Sequential(
@@ -81,8 +97,8 @@ class Qwen3VLRegressionModel(nn.Module):
             batch_size = pixel_values.shape[0]
             # Qwen3-VL expects grid_thw as (num_images, 3) where each row is [t, h, w]
             # For static images: t=1, h and w depend on image patches
-            h = pixel_values.shape[2] // 14  # patch size is 14
-            w = pixel_values.shape[3] // 14
+            h = pixel_values.shape[2] // self.patch_size
+            w = pixel_values.shape[3] // self.patch_size
             grid_thw = torch.tensor([[1, h, w]] * batch_size, device=pixel_values.device)
 
         # Extract vision features
