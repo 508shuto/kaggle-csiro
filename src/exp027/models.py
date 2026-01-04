@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
-from transformers import Qwen3VLForConditionalGeneration
+from PIL import Image
+from transformers import AutoImageProcessor, Qwen3VLForConditionalGeneration
 
 
 class Qwen3VLRegressionModel(nn.Module):
@@ -15,7 +16,7 @@ class Qwen3VLRegressionModel(nn.Module):
         model_name: str = "Qwen/Qwen3-VL-2B-Instruct",
         pretrained: bool = True,
         freeze_backbone: bool = True,
-        hidden_dim: int = 1536,
+        hidden_dim: int = 2048,  # Qwen3-VL-2B out_hidden_size
         head_hidden_dim: int = 256,
         dropout: float = 0.2,
         out_channels: int = 3,  # [clover, dead, green]
@@ -38,7 +39,10 @@ class Qwen3VLRegressionModel(nn.Module):
             self.vlm = Qwen3VLForConditionalGeneration(config)
 
         # Extract vision encoder
-        self.vision_encoder = self.vlm.model.vision_model
+        self.vision_encoder = self.vlm.model.visual
+
+        # Initialize image processor
+        self.processor = AutoImageProcessor.from_pretrained(model_name)
 
         # Freeze backbone if specified
         self.freeze_backbone = freeze_backbone
@@ -47,16 +51,13 @@ class Qwen3VLRegressionModel(nn.Module):
                 param.requires_grad = False
 
         # Validate hidden dimension matches vision encoder output
-        actual_hidden_dim = self.vision_encoder.config.hidden_size
+        actual_hidden_dim = self.vision_encoder.config.out_hidden_size
         assert hidden_dim == actual_hidden_dim, (
-            f"Config hidden_dim ({hidden_dim}) must match Qwen3-VL output ({actual_hidden_dim})"
+            f"Config hidden_dim ({hidden_dim}) must match Qwen3-VL out_hidden_size ({actual_hidden_dim})"
         )
 
         # Get hidden dimension from vision encoder
         self.hidden_dim = hidden_dim
-
-        # Store patch size for grid calculation
-        self.patch_size = self.vision_encoder.config.patch_size
 
         # Regression head for main targets (predicts 3: clover, dead, green)
         self.head = nn.Sequential(
@@ -74,61 +75,35 @@ class Qwen3VLRegressionModel(nn.Module):
             nn.Linear(head_hidden_dim, aux_out_channels),
         )
 
-    def forward(self, pixel_values: torch.Tensor, grid_thw: torch.Tensor | None = None):
+    def forward(self, images: list[Image.Image]):
         """Forward pass.
 
         Args:
-            pixel_values: Image tensor of shape (B, C, H, W)
-            grid_thw: Grid dimensions tensor for Qwen3-VL (optional)
+            images: List of PIL images
 
         Returns:
             pred: Predictions of shape (B, 5) [Clover, Dead, Green, GDM, Total]
             aux_pred: Auxiliary predictions of shape (B, 2) [NDVI, Height]
         """
-        # Get vision features from Qwen3-VL vision encoder
-        # The vision encoder expects pixel_values and grid_thw
-        if grid_thw is None:
-            # Create default grid_thw for single images
-            batch_size = pixel_values.shape[0]
-            # Qwen3-VL expects grid_thw as (num_images, 3) where each row is [t, h, w]
-            # For static images: t=1, h and w depend on image patches
+        # Get device from model parameters
+        device = next(self.vlm.parameters()).device
 
-            # Validate image dimensions are divisible by patch size
-            height, width = pixel_values.shape[2], pixel_values.shape[3]
-            assert height % self.patch_size == 0, (
-                f"Image height {height} must be divisible by patch_size {self.patch_size}"
-            )
-            assert width % self.patch_size == 0, (
-                f"Image width {width} must be divisible by patch_size {self.patch_size}"
-            )
+        # Process images with Qwen3VL processor
+        processed = self.processor(images=images, return_tensors="pt")
+        pixel_values = processed.pixel_values.to(device)
+        grid_thw = processed.image_grid_thw.to(device)
 
-            h = height // self.patch_size
-            w = width // self.patch_size
-            grid_thw = torch.tensor([[1, h, w]] * batch_size, device=pixel_values.device)
-
-        # Extract vision features
-        # PyTorch automatically skips gradient computation for frozen parameters
-        vision_outputs = self.vision_encoder(
-            pixel_values=pixel_values,
-            grid_thw=grid_thw,
+        # Extract vision features using get_image_features
+        # Returns tuple: (image_embeds, deepstack_embeds)
+        image_embeds, _ = self.vlm.model.get_image_features(
+            pixel_values.type(self.vlm.model.visual.dtype),
+            grid_thw,
         )
 
-        # Get hidden states: shape (total_patches, hidden_dim)
-        hidden_states = vision_outputs.last_hidden_state
-
-        # Global average pooling over sequence dimension
-        # For batched processing, we need to handle variable sequence lengths
-        # For simplicity, take mean over all patches
-        if hidden_states.dim() == 2:
-            # Shape: (total_patches, hidden_dim) - need to reshape per batch
-            # Use grid_thw to determine batch boundaries
-            # Vectorized processing: compute split sizes and use torch.split
-            split_sizes = (grid_thw[:, 0] * grid_thw[:, 1] * grid_thw[:, 2]).tolist()
-            batch_hiddens = torch.split(hidden_states, split_sizes, dim=0)
-            pooled = torch.stack([h.mean(dim=0) for h in batch_hiddens], dim=0)  # (B, hidden_dim)
-        else:
-            # Shape: (B, seq_len, hidden_dim)
-            pooled = hidden_states.mean(dim=1)  # (B, hidden_dim)
+        # image_embeds is a tuple of tensors, one per image
+        # Each tensor has shape (num_patches, hidden_dim)
+        # Pool over patches for each image
+        pooled = torch.stack([emb.mean(dim=0) for emb in image_embeds], dim=0)  # (B, hidden_dim)
 
         # Convert to float32 for regression head
         pooled = pooled.float()
@@ -158,6 +133,8 @@ class Qwen3VLRegressionModel(nn.Module):
 if __name__ == "__main__":
     from argparse import ArgumentParser
 
+    import numpy as np
+
     parser = ArgumentParser()
     parser.add_argument("--model_name", type=str, default="Qwen/Qwen3-VL-2B-Instruct")
     parser.add_argument("--device", choices=["cpu", "mps", "cuda"], default="cpu")
@@ -172,13 +149,16 @@ if __name__ == "__main__":
     ).to(device)
     model.eval()
 
+    # Create dummy PIL images
     batch_size = 2
-    channels = 3
     height = 384
     width = 384
 
-    dummy_input = torch.randn(batch_size, channels, height, width).to(device)
+    dummy_images = [
+        Image.fromarray(np.random.randint(0, 255, (height, width, 3), dtype=np.uint8)) for _ in range(batch_size)
+    ]
+
     with torch.no_grad():
-        pred, aux_pred = model(dummy_input)
+        pred, aux_pred = model(dummy_images)
     print(f"pred shape: {pred.shape}")  # Expected: (2, 5)
     print(f"aux_pred shape: {aux_pred.shape}")  # Expected: (2, 2)

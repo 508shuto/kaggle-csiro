@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pandas as pd
 import pytorch_lightning as L
+import torch
 import tyro
 import wandb
 from dataset import CSIRODataset
@@ -89,11 +90,28 @@ def train_fold(config: DictConfig, df: pd.DataFrame, fold: int) -> None:
     )
     trainer.fit(module, train_dataloaders=train_loader, val_dataloaders=valid_loader)
 
-    # Rename last.ckpt to fold{fold}_epoch{epoch}.ckpt
+    # Rename last.ckpt to fold{fold}_epoch={epoch}-val_score={val_score:.4f}.ckpt
     last_ckpt = Path(config.dataset.output_dir) / "last.ckpt"
     if last_ckpt.exists():
-        epoch = trainer.current_epoch
-        new_name = Path(config.dataset.output_dir) / f"fold{fold}_epoch{epoch:02d}.ckpt"
+        # epochはcheckpointファイルから取得（trainer.current_epochの+1ズレを避ける）
+        ckpt = torch.load(last_ckpt, map_location="cpu")
+        epoch = ckpt.get("epoch", trainer.current_epoch)
+        if epoch is None:
+            epoch = trainer.current_epoch
+
+        # val_scoreはtrainerのcallback_metricsから取得
+        if "val_score" not in trainer.callback_metrics:
+            raise ValueError(
+                f"val_score not found in trainer.callback_metrics. "
+                f"Available keys: {list(trainer.callback_metrics.keys())}"
+            )
+        val_score_tensor = trainer.callback_metrics["val_score"]
+        if isinstance(val_score_tensor, torch.Tensor):
+            val_score = val_score_tensor.item()
+        else:
+            val_score = float(val_score_tensor)
+
+        new_name = Path(config.dataset.output_dir) / f"fold{fold}_epoch={epoch}-val_score={val_score:.4f}.ckpt"
         last_ckpt.rename(new_name)
         print(f"Saved checkpoint: {new_name}")
 

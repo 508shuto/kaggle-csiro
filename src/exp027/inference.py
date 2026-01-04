@@ -13,6 +13,11 @@ from torchvision import transforms as T
 from tqdm import tqdm
 
 
+def collate_fn(batch: list[Image.Image]) -> list[Image.Image]:
+    """Custom collate function for PIL images in test dataset."""
+    return batch
+
+
 def detect_device(device: str) -> str:
     """Detect available device automatically.
 
@@ -75,20 +80,22 @@ class TestDataset(Dataset):
         self.transform = self._get_transforms()
 
     def _get_transforms(self) -> T.Compose:
-        """Get transforms for test data."""
+        """Get transforms for test data.
+
+        Note: Returns PIL images without ToTensor/Normalize because
+        Qwen3VLImageProcessor handles the full preprocessing.
+        """
         image_size = self.config.augmentation.valid.image_size
         return T.Compose(
             [
                 T.Resize((image_size, image_size)),
-                T.ToTensor(),
-                T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
             ]
         )
 
     def __len__(self):
         return len(self.df)
 
-    def __getitem__(self, idx: int):
+    def __getitem__(self, idx: int) -> Image.Image:
         row = self.df.iloc[idx]
         # Load image with PIL
         try:
@@ -116,9 +123,10 @@ def predict_fold(
         batch_size=batch_size,
         shuffle=False,
         num_workers=num_workers,
-        pin_memory=device.startswith("cuda"),
+        pin_memory=False,  # Cannot pin PIL images
         prefetch_factor=2 if num_workers > 0 else None,
         persistent_workers=num_workers > 0,
+        collate_fn=collate_fn,
     )
 
     checkpoints = list(model_dir.glob(f"fold{fold}*.ckpt"))
@@ -157,24 +165,27 @@ def predict(
     use_amp: bool = False,
     use_tta: bool = False,
 ) -> np.ndarray:
-    """Predict with optional AMP and TTA support.
+    """Predict with optional AMP support.
 
     Args:
         fold: Fold number for logging
         model: Model to use for prediction
-        dataloader: DataLoader for test data
+        dataloader: DataLoader for test data (returns PIL images)
         device: Device to run on
         use_amp: Whether to use automatic mixed precision
-        use_tta: Whether to use test time augmentation
+        use_tta: Whether to use test time augmentation (NOT SUPPORTED for PIL input)
 
     Returns:
         Array of predictions shape (N, 5)
     """
+    if use_tta:
+        print("Warning: TTA is not supported with PIL image input. Ignoring use_tta=True.")
+
     fold_predictions = []
     device_type = "cuda" if device.startswith("cuda") else ("mps" if device.startswith("mps") else "cpu")
 
-    for batch in tqdm(dataloader, desc=f"Fold {fold}"):
-        images = batch.to(device)
+    for images in tqdm(dataloader, desc=f"Fold {fold}"):
+        # images is a list of PIL images
         batch_predictions = []
 
         # Main prediction
@@ -186,46 +197,13 @@ def predict(
                 pred, _ = model(images)
             batch_predictions.append(pred.cpu().detach())
 
-        # TTA (Test Time Augmentation) - works on all devices
-        if use_tta:
-            with torch.no_grad():
-                # Use AMP only on CUDA for TTA
-                if use_amp and device_type == "cuda":
-                    with torch.amp.autocast(device_type=device_type):
-                        # Horizontal flip
-                        hflip_pred, _ = model(torch.flip(images, dims=[3]))
-                        batch_predictions.append(hflip_pred.cpu().detach())
-                        # Vertical flip
-                        vflip_pred, _ = model(torch.flip(images, dims=[2]))
-                        batch_predictions.append(vflip_pred.cpu().detach())
-                        # Rot90
-                        rot90_pred, _ = model(torch.rot90(images, k=1, dims=[2, 3]))
-                        batch_predictions.append(rot90_pred.cpu().detach())
-                        # Rot270
-                        rot270_pred, _ = model(torch.rot90(images, k=3, dims=[2, 3]))
-                        batch_predictions.append(rot270_pred.cpu().detach())
-                else:
-                    # TTA without AMP (works on all devices)
-                    # Horizontal flip
-                    hflip_pred, _ = model(torch.flip(images, dims=[3]))
-                    batch_predictions.append(hflip_pred.cpu().detach())
-                    # Vertical flip
-                    vflip_pred, _ = model(torch.flip(images, dims=[2]))
-                    batch_predictions.append(vflip_pred.cpu().detach())
-                    # Rot90
-                    rot90_pred, _ = model(torch.rot90(images, k=1, dims=[2, 3]))
-                    batch_predictions.append(rot90_pred.cpu().detach())
-                    # Rot270
-                    rot270_pred, _ = model(torch.rot90(images, k=3, dims=[2, 3]))
-                    batch_predictions.append(rot270_pred.cpu().detach())
-
-        # Clamp to non-negative and average (for TTA)
+        # Clamp to non-negative
         batch_predictions_processed = []
         for pred_tensor in batch_predictions:
             pred_processed = torch.clamp(pred_tensor, min=0.0)
             batch_predictions_processed.append(pred_processed.numpy())
 
-        # Average predictions
+        # Average predictions (single prediction per batch for now)
         batch_pred = np.mean(batch_predictions_processed, axis=0)
         fold_predictions.append(batch_pred)
 

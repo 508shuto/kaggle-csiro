@@ -6,7 +6,7 @@ from omegaconf import DictConfig
 from timm.optim._optim_factory import create_optimizer_v2
 from timm.scheduler.scheduler_factory import create_scheduler_v2
 from timm.utils.model_ema import ModelEmaV3
-from torchmetrics import MetricCollection, R2Score
+from torchmetrics import MeanAbsoluteError, MeanSquaredError, MetricCollection, R2Score
 
 from utils import get_loss_fn, mixup_batch
 
@@ -35,6 +35,8 @@ class CSIROModule(L.LightningModule):
             {
                 "r2_score": R2Score(multioutput="raw_values"),
                 "weighted_r2_score": WeightedR2Score(),
+                "rmse": MeanSquaredError(squared=False),
+                "mae": MeanAbsoluteError(),
             }
         )
         self.aux_metrics = MetricCollection(
@@ -93,6 +95,13 @@ class CSIROModule(L.LightningModule):
         self.metrics.update(preds, targets)
         self.aux_metrics.update(aux_preds, aux_targets)
 
+        # Per-class RMSE/MAE計算のためにバッチごとのpreds/targetsを保存
+        if not hasattr(self, "val_preds"):
+            self.val_preds = []
+            self.val_targets = []
+        self.val_preds.append(preds)
+        self.val_targets.append(targets)
+
         self.log("val_loss", loss, prog_bar=True, on_step=False, on_epoch=True)
         self.log(
             "val_aux_loss",
@@ -106,6 +115,27 @@ class CSIROModule(L.LightningModule):
     def on_validation_epoch_end(self):
         metrics = self.metrics.compute()
         aux_metrics = self.aux_metrics.compute()
+
+        # Per-class RMSE/MAE計算
+        if hasattr(self, "val_preds") and len(self.val_preds) > 0:
+            all_preds = torch.cat(self.val_preds, dim=0)  # (N, 5)
+            all_targets = torch.cat(self.val_targets, dim=0)  # (N, 5)
+
+            # 各クラスごとにRMSEとMAEを計算
+            for i, class_name in enumerate(CLASS_NAMES):
+                # Per-class RMSE
+                class_mse = torch.mean((all_preds[:, i] - all_targets[:, i]) ** 2)
+                class_rmse = torch.sqrt(class_mse)
+                self.log(f"val_rmse_{class_name}", class_rmse)
+
+                # Per-class MAE
+                class_mae = torch.mean(torch.abs(all_preds[:, i] - all_targets[:, i]))
+                self.log(f"val_mae_{class_name}", class_mae)
+
+            # リストをクリア
+            self.val_preds = []
+            self.val_targets = []
+
         # R2スコアの処理
         if "r2_score" in metrics:
             r2_scores = metrics["r2_score"]  # (5,)
@@ -130,6 +160,14 @@ class CSIROModule(L.LightningModule):
         # CompetitionMetrics（全クラスの重み付きR2の合計）
         if "weighted_r2_score" in metrics:
             self.log("val_score", metrics["weighted_r2_score"])
+
+        # RMSE（全体）
+        if "rmse" in metrics:
+            self.log("val_rmse", metrics["rmse"])
+
+        # MAE（全体）
+        if "mae" in metrics:
+            self.log("val_mae", metrics["mae"])
 
         self.metrics.reset()
         self.aux_metrics.reset()
