@@ -33,9 +33,11 @@ class WeightedR2Score(Metric):
           weighted_mean = sum w_i * y_true_i / sum w_i
     """
 
-    def __init__(self):
+    def __init__(self, weights: list[float] | None = None):
         super().__init__()
-        self.weights = torch.tensor(WEIGHTS, dtype=torch.float32)
+        if weights is None:
+            weights = WEIGHTS
+        self.weights = torch.tensor(weights, dtype=torch.float32)
         # Accumulate predictions and targets (distributed training compatible)
         self.add_state("preds", default=[], dist_reduce_fx="cat")
         self.add_state("targets", default=[], dist_reduce_fx="cat")

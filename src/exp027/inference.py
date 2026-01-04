@@ -91,7 +91,10 @@ class TestDataset(Dataset):
     def __getitem__(self, idx: int):
         row = self.df.iloc[idx]
         # Load image with PIL
-        image = Image.open(row["image_path"]).convert("RGB")
+        try:
+            image = Image.open(row["image_path"]).convert("RGB")
+        except (FileNotFoundError, OSError) as e:
+            raise RuntimeError(f"Failed to load image {row['image_path']}: {e}") from e
         image = self.transform(image)
         return image
 
@@ -174,20 +177,35 @@ def predict(
         images = batch.to(device)
         batch_predictions = []
 
-        if use_amp and device_type == "cuda":
-            with torch.no_grad():
+        # Main prediction
+        with torch.no_grad():
+            if use_amp and device_type == "cuda":
                 with torch.amp.autocast(device_type=device_type):
                     pred, _ = model(images)
-            batch_predictions.append(pred.cpu().detach())
-        else:
-            with torch.no_grad():
+            else:
                 pred, _ = model(images)
             batch_predictions.append(pred.cpu().detach())
 
-        # TTA (Test Time Augmentation)
-        if use_tta and use_amp and device_type == "cuda":
+        # TTA (Test Time Augmentation) - works on all devices
+        if use_tta:
             with torch.no_grad():
-                with torch.amp.autocast(device_type=device_type):
+                # Use AMP only on CUDA for TTA
+                if use_amp and device_type == "cuda":
+                    with torch.amp.autocast(device_type=device_type):
+                        # Horizontal flip
+                        hflip_pred, _ = model(torch.flip(images, dims=[3]))
+                        batch_predictions.append(hflip_pred.cpu().detach())
+                        # Vertical flip
+                        vflip_pred, _ = model(torch.flip(images, dims=[2]))
+                        batch_predictions.append(vflip_pred.cpu().detach())
+                        # Rot90
+                        rot90_pred, _ = model(torch.rot90(images, k=1, dims=[2, 3]))
+                        batch_predictions.append(rot90_pred.cpu().detach())
+                        # Rot270
+                        rot270_pred, _ = model(torch.rot90(images, k=3, dims=[2, 3]))
+                        batch_predictions.append(rot270_pred.cpu().detach())
+                else:
+                    # TTA without AMP (works on all devices)
                     # Horizontal flip
                     hflip_pred, _ = model(torch.flip(images, dims=[3]))
                     batch_predictions.append(hflip_pred.cpu().detach())
@@ -200,20 +218,6 @@ def predict(
                     # Rot270
                     rot270_pred, _ = model(torch.rot90(images, k=3, dims=[2, 3]))
                     batch_predictions.append(rot270_pred.cpu().detach())
-        elif use_tta:
-            with torch.no_grad():
-                # Horizontal flip
-                hflip_pred, _ = model(torch.flip(images, dims=[3]))
-                batch_predictions.append(hflip_pred.cpu().detach())
-                # Vertical flip
-                vflip_pred, _ = model(torch.flip(images, dims=[2]))
-                batch_predictions.append(vflip_pred.cpu().detach())
-                # Rot90
-                rot90_pred, _ = model(torch.rot90(images, k=1, dims=[2, 3]))
-                batch_predictions.append(rot90_pred.cpu().detach())
-                # Rot270
-                rot270_pred, _ = model(torch.rot90(images, k=3, dims=[2, 3]))
-                batch_predictions.append(rot270_pred.cpu().detach())
 
         # Clamp to non-negative and average (for TTA)
         batch_predictions_processed = []

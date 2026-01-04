@@ -3,18 +3,22 @@ import torch.nn as nn
 
 
 class WeightedMSELoss(nn.Module):
-    def __init__(self):
+    def __init__(self, weights: list[float] | None = None):
         super().__init__()
-        self.weight = torch.tensor([0.1, 0.1, 0.1, 0.2, 0.5])
+        if weights is None:
+            weights = [0.1, 0.1, 0.1, 0.2, 0.5]
+        self.weight = torch.tensor(weights)
 
     def forward(self, preds: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
         return torch.mean(self.weight.to(preds.device) * (preds - targets) ** 2)
 
 
 class WeightedSmoothL1Loss(nn.Module):
-    def __init__(self):
+    def __init__(self, weights: list[float] | None = None):
         super().__init__()
-        self.weight = torch.tensor([0.1, 0.1, 0.1, 0.2, 0.5])
+        if weights is None:
+            weights = [0.1, 0.1, 0.1, 0.2, 0.5]
+        self.weight = torch.tensor(weights)
         self.smooth_l1_loss = nn.SmoothL1Loss(reduction="none")
 
     def forward(self, preds: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
