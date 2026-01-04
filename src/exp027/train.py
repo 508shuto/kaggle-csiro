@@ -11,7 +11,6 @@ import wandb
 from dataset import CSIRODataset
 from lightning_module import CSIROModule
 from omegaconf import DictConfig, OmegaConf
-from PIL import Image
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
 from pytorch_lightning.loggers import WandbLogger
 from torch.utils.data import DataLoader
@@ -19,15 +18,13 @@ from torch.utils.data import DataLoader
 from utils import seed_everything
 
 
-def collate_fn(batch: list[tuple[Image.Image, torch.Tensor, torch.Tensor]]):
-    """Custom collate function for PIL images.
-
-    PIL images cannot be stacked with torch.stack(), so we keep them as a list.
-    """
-    images = [item[0] for item in batch]  # List[PIL.Image]
-    targets = torch.stack([item[1] for item in batch])
-    aux_targets = torch.stack([item[2] for item in batch])
-    return images, targets, aux_targets
+def collate_fn(batch: list[tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]]):
+    """Collate function for preprocessed tensors."""
+    pixel_values = torch.stack([item[0] for item in batch])
+    grid_thw = torch.stack([item[1] for item in batch])
+    targets = torch.stack([item[2] for item in batch])
+    aux_targets = torch.stack([item[3] for item in batch])
+    return pixel_values, grid_thw, targets, aux_targets
 
 
 def train_fold(config: DictConfig, df: pd.DataFrame, fold: int) -> None:
