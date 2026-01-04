@@ -22,7 +22,7 @@ class DataItem:
     total_target: float
 
 
-def create_metadata(df: pd.DataFrame, output_dir: Path) -> pd.DataFrame:
+def create_metadata(df: pd.DataFrame, input_dir: Path) -> pd.DataFrame:
     # group by image_path
     data_items: list[DataItem] = []
     image_paths = df["image_path"].unique()
@@ -49,7 +49,8 @@ def create_metadata(df: pd.DataFrame, output_dir: Path) -> pd.DataFrame:
                 target_dict["total_target"] = row["target"]
             else:
                 raise ValueError(f"Target name {row['target_name']} not found")
-        data_path = output_dir / "train" / (str(Path(image_path).stem) + ".npy")
+        # JPEGファイルのフルパスを生成（input/train/xxx.jpg）
+        data_path = input_dir / image_path
         data_items.append(
             DataItem(
                 sample_id=sample_id,
@@ -78,9 +79,10 @@ def main():
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Load data
-    df = pd.read_csv(Path(config.dataset.input_dir) / "train.csv")
+    input_dir = Path(config.dataset.input_dir)
+    df = pd.read_csv(input_dir / "train.csv")
 
-    df = create_metadata(df, output_dir)
+    df = create_metadata(df, input_dir)
 
     # Split data
     df["fold"] = -1

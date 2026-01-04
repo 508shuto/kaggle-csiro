@@ -8,10 +8,10 @@
 - 既存の機能（log1p廃止、SmoothL1Loss）に影響がない
 
 ## タスク
-- [ ] TODO: `src/exp025/create_dataset.py` を修正し、`image_path` にJPEGファイルパスを格納するように変更する
-- [ ] TODO: `src/exp025/dataset.py` を修正し、`np.load()` を廃止してPILでJPEGを読み込むように変更する
-- [ ] TODO: `src/exp025/inference.py` の `build_test_index` を修正し、テスト画像もJPEGパスを参照するように変更する
-- [ ] TODO: `src/exp025/inference.py` の `TestDataset` を修正し、JPEGを直接読み込むように変更する
-- [ ] TODO: スモークチェック（compileall、import確認）を実行する
+- [x] Done: `src/exp025/create_dataset.py` を修正し、`image_path` にJPEGファイルパスを格納するように変更する
+- [x] Done: `src/exp025/dataset.py` を修正し、`np.load()` を廃止してPILでJPEGを読み込むように変更する
+- [x] Done: `src/exp025/inference.py` の `build_test_index` を修正し、テスト画像もJPEGパスを参照するように変更する
+- [x] Done: `src/exp025/inference.py` の `TestDataset` を修正し、JPEGを直接読み込むように変更する
+- [x] Done: スモークチェック（compileall、import確認）を実行する
 - [ ] TODO: 実際に学習・推論が実行できることを確認する
 

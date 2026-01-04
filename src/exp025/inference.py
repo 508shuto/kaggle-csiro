@@ -7,6 +7,7 @@ import torch.nn as nn
 import tyro
 from lightning_module import CSIROModule
 from omegaconf import DictConfig, OmegaConf
+from PIL import Image
 from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
 
@@ -33,12 +34,12 @@ def detect_device(device: str) -> str:
         return "cpu"
 
 
-def build_test_index(test_csv_path: Path, output_dir: Path) -> pd.DataFrame:
+def build_test_index(test_csv_path: Path, input_dir: Path) -> pd.DataFrame:
     """Build test dataset index from test CSV.
 
     Args:
         test_csv_path: Path to test.csv file
-        output_dir: Output directory containing converted numpy files
+        input_dir: Input directory containing JPEG files
 
     Returns:
         DataFrame with columns: sample_id, image_path
@@ -54,14 +55,13 @@ def build_test_index(test_csv_path: Path, output_dir: Path) -> pd.DataFrame:
         sample_id_row = df[df["image_path"] == image_path].iloc[0]
         sample_id = sample_id_row["sample_id"].split("__")[0]
 
-        # Convert image_path to numpy file path
-        image_stem = Path(image_path).stem
-        npy_path = output_dir / "test" / (image_stem + ".npy")
+        # JPEGファイルのフルパスを生成（input/test/xxx.jpg）
+        jpeg_path = input_dir / image_path
 
         data_items.append(
             {
                 "sample_id": sample_id,
-                "image_path": npy_path,
+                "image_path": jpeg_path,
             }
         )
 
@@ -79,7 +79,8 @@ class TestDataset(Dataset):
 
     def __getitem__(self, idx: int):
         row = self.df.iloc[idx]
-        image = np.load(row["image_path"])
+        # JPEGファイルをPILで読み込んでNumPy配列に変換
+        image = np.array(Image.open(row["image_path"]).convert("RGB"))
         if self.transform is not None:
             image = self.transform(image=image)["image"]
         else:
@@ -252,7 +253,8 @@ def main(
     print(f"Using device: {device}")
 
     # Build test index (sample_id, image_path)
-    df = build_test_index(test_csv_path, output_dir)
+    input_dir = Path(config.dataset.input_dir)
+    df = build_test_index(test_csv_path, input_dir)
 
     # Collect predictions from all folds
     fold_predictions: list[np.ndarray] = []
