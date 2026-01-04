@@ -47,7 +47,9 @@ class Qwen3VLRegressionModel(nn.Module):
         # Freeze backbone if specified
         self.freeze_backbone = freeze_backbone
         if freeze_backbone:
-            for param in self.vision_encoder.parameters():
+            # Freeze entire VLM (vision encoder + language model)
+            # Only regression heads will be trainable
+            for param in self.vlm.parameters():
                 param.requires_grad = False
 
         # Validate hidden dimension matches vision encoder output
@@ -111,8 +113,8 @@ class Qwen3VLRegressionModel(nn.Module):
         # Predict 3 base targets: [Clover, Dead, Green]
         pred_3 = self.head(pooled)  # (B, 3)
 
-        # Clamp to non-negative values
-        pred_3 = torch.clamp(pred_3, min=0.0)
+        # Note: Clamping removed to preserve gradients during training
+        # Non-negative constraint is applied in validation_step instead
 
         # Apply physical constraints
         clover = pred_3[:, 0]  # (B,)
