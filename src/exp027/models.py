@@ -47,6 +47,7 @@ class Qwen3VLRegressionModel(nn.Module):
         self.vision_encoder = self.vlm.model.vision_model
 
         # Freeze backbone if specified
+        self.freeze_backbone = freeze_backbone
         if freeze_backbone:
             for param in self.vision_encoder.parameters():
                 param.requires_grad = False
@@ -97,12 +98,29 @@ class Qwen3VLRegressionModel(nn.Module):
             batch_size = pixel_values.shape[0]
             # Qwen3-VL expects grid_thw as (num_images, 3) where each row is [t, h, w]
             # For static images: t=1, h and w depend on image patches
-            h = pixel_values.shape[2] // self.patch_size
-            w = pixel_values.shape[3] // self.patch_size
+
+            # Validate image dimensions are divisible by patch size
+            height, width = pixel_values.shape[2], pixel_values.shape[3]
+            assert height % self.patch_size == 0, (
+                f"Image height {height} must be divisible by patch_size {self.patch_size}"
+            )
+            assert width % self.patch_size == 0, (
+                f"Image width {width} must be divisible by patch_size {self.patch_size}"
+            )
+
+            h = height // self.patch_size
+            w = width // self.patch_size
             grid_thw = torch.tensor([[1, h, w]] * batch_size, device=pixel_values.device)
 
         # Extract vision features
-        with torch.set_grad_enabled(not self.training or any(p.requires_grad for p in self.vision_encoder.parameters())):
+        # Use torch.no_grad() when backbone is frozen, otherwise allow gradients during training
+        if self.freeze_backbone:
+            with torch.no_grad():
+                vision_outputs = self.vision_encoder(
+                    pixel_values=pixel_values,
+                    grid_thw=grid_thw,
+                )
+        else:
             vision_outputs = self.vision_encoder(
                 pixel_values=pixel_values,
                 grid_thw=grid_thw,
