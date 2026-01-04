@@ -47,12 +47,11 @@ def train_fold(config: DictConfig, df: pd.DataFrame, fold: int) -> None:
 
     callbacks = [
         ModelCheckpoint(
-            monitor="val_score",
-            mode="max",
-            save_top_k=1,
-            save_last=True,
             dirpath=config.dataset.output_dir,
-            filename=f"fold{fold}_{{epoch:02d}}-{{val_score:.4f}}",
+            filename=f"fold{fold}_last",
+            save_top_k=1,
+            every_n_epochs=1,
+            save_on_train_epoch_end=True,
         ),
     ]
     if config.trainer.train.patience is not None:
