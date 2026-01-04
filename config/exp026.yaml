@@ -25,9 +25,7 @@ aux_loss:
 
 trainer:
   train:
-    lr: 1e-3  # ヘッドのみ学習なのでlrを上げる
-    weight_decay: 1e-4
-    epochs: 100
+    epochs: 50  # フリーズ時は収束が早いためepoch数削減
     warmup_epochs: 3
     batch_size: 16
     num_workers: 4
@@ -64,7 +62,7 @@ trainer:
 
 augmentation:
   train:
-    image_size: 256  # DINOv3の推奨サイズ
+    image_size: 224  # DINOv3の標準サイズ
     horizontal_flip: 0.5
     vertical_flip: 0.5
     rotation_limit: 20
@@ -80,6 +78,6 @@ augmentation:
       alpha: 0.2
       prob: 0.5
   valid:
-    image_size: 256  # DINOv3の推奨サイズ
+    image_size: 224  # DINOv3の標準サイズ
     horizontal_flip: 0.0
     vertical_flip: 0.0
