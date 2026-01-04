@@ -45,15 +45,12 @@ def train_fold(config: DictConfig, df: pd.DataFrame, fold: int) -> None:
         persistent_workers=config.trainer.valid.num_workers > 0,
     )
 
-    callbacks = [
-        ModelCheckpoint(
-            dirpath=config.dataset.output_dir,
-            filename=f"fold{fold}_last",
-            save_top_k=1,
-            every_n_epochs=1,
-            save_on_train_epoch_end=True,
-        ),
-    ]
+    checkpoint_callback = ModelCheckpoint(
+        dirpath=config.dataset.output_dir,
+        save_top_k=0,
+        save_last=True,
+    )
+    callbacks = [checkpoint_callback]
     if config.trainer.train.patience is not None:
         callbacks.append(
             EarlyStopping(
@@ -91,6 +88,14 @@ def train_fold(config: DictConfig, df: pd.DataFrame, fold: int) -> None:
         logger=logger,
     )
     trainer.fit(module, train_dataloaders=train_loader, val_dataloaders=valid_loader)
+
+    # Rename last.ckpt to fold{fold}_epoch{epoch}.ckpt
+    last_ckpt = Path(config.dataset.output_dir) / "last.ckpt"
+    if last_ckpt.exists():
+        epoch = trainer.current_epoch
+        new_name = Path(config.dataset.output_dir) / f"fold{fold}_epoch{epoch:02d}.ckpt"
+        last_ckpt.rename(new_name)
+        print(f"Saved checkpoint: {new_name}")
 
     if config.trainer.train.use_wandb:
         wandb.finish()
