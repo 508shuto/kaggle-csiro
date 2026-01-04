@@ -122,18 +122,10 @@ class Qwen3VLRegressionModel(nn.Module):
         if hidden_states.dim() == 2:
             # Shape: (total_patches, hidden_dim) - need to reshape per batch
             # Use grid_thw to determine batch boundaries
-            # Compute num_patches on GPU to avoid CPU transfers
-            num_patches_per_batch = grid_thw[:, 0] * grid_thw[:, 1] * grid_thw[:, 2]  # (B,)
-
-            # Use tensor operations to split and pool
-            features = []
-            start_idx = 0
-            for num_patches in num_patches_per_batch:
-                end_idx = start_idx + num_patches
-                batch_hidden = hidden_states[start_idx:end_idx]
-                features.append(batch_hidden.mean(dim=0))
-                start_idx = end_idx
-            pooled = torch.stack(features, dim=0)  # (B, hidden_dim)
+            # Vectorized processing: compute split sizes and use torch.split
+            split_sizes = (grid_thw[:, 0] * grid_thw[:, 1] * grid_thw[:, 2]).tolist()
+            batch_hiddens = torch.split(hidden_states, split_sizes, dim=0)
+            pooled = torch.stack([h.mean(dim=0) for h in batch_hiddens], dim=0)  # (B, hidden_dim)
         else:
             # Shape: (B, seq_len, hidden_dim)
             pooled = hidden_states.mean(dim=1)  # (B, hidden_dim)
