@@ -27,7 +27,7 @@ trainer:
   train:
     lr: 1e-3  # ヘッドのみ学習なのでlrを上げる
     weight_decay: 1e-4
-    epochs: 50  # フリーズ時はepoch数を減らす
+    epochs: 100
     warmup_epochs: 3
     batch_size: 16
     num_workers: 4

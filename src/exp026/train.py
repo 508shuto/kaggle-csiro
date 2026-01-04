@@ -50,7 +50,7 @@ def train_fold(config: DictConfig, df: pd.DataFrame, fold: int) -> None:
             monitor="val_score",
             mode="max",
             save_top_k=1,
-            save_last=False,
+            save_last=True,
             dirpath=config.dataset.output_dir,
             filename=f"fold{fold}_{{epoch:02d}}-{{val_score:.4f}}",
         ),
