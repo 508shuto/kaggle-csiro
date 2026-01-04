@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import torch
 from omegaconf import DictConfig
+from PIL import Image
 from torch.utils.data import Dataset
 
 from utils import get_transforms
@@ -20,7 +21,8 @@ class CSIRODataset(Dataset):
 
     def __getitem__(self, idx: int) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         row = self.df.iloc[idx]
-        image = np.load(row["image_path"])
+        # JPEGファイルをPILで読み込んでNumPy配列に変換
+        image = np.array(Image.open(row["image_path"]).convert("RGB"))
 
         # raw値をそのまま使用（log1p変換なし）
         target = torch.tensor(
