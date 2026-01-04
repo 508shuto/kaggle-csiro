@@ -6,7 +6,7 @@ from omegaconf import DictConfig
 from timm.optim._optim_factory import create_optimizer_v2
 from timm.scheduler.scheduler_factory import create_scheduler_v2
 from timm.utils.model_ema import ModelEmaV3
-from torchmetrics import MetricCollection, R2Score
+from torchmetrics import MeanAbsoluteError, MeanSquaredError, MetricCollection, R2Score
 
 from utils import get_loss_fn, mixup_batch
 
@@ -33,6 +33,8 @@ class CSIROModule(L.LightningModule):
             {
                 "r2_score": R2Score(multioutput="raw_values"),
                 "weighted_r2_score": WeightedR2Score(),
+                "rmse": MeanSquaredError(squared=False),
+                "mae": MeanAbsoluteError(),
             }
         )
         self.aux_metrics = MetricCollection(
@@ -128,6 +130,14 @@ class CSIROModule(L.LightningModule):
         # CompetitionMetrics（全クラスの重み付きR2の合計）
         if "weighted_r2_score" in metrics:
             self.log("val_score", metrics["weighted_r2_score"])
+
+        # RMSE
+        if "rmse" in metrics:
+            self.log("val_rmse", metrics["rmse"])
+
+        # MAE
+        if "mae" in metrics:
+            self.log("val_mae", metrics["mae"])
 
         self.metrics.reset()
         self.aux_metrics.reset()
