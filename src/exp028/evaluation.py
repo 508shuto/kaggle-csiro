@@ -54,6 +54,7 @@ def main(
                 checkpoint_path=model_path,
                 config=config,
                 map_location=device,
+                weights_only=False,
             )
             .model_ema.module.eval()
             .to(device)

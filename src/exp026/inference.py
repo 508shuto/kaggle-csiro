@@ -118,6 +118,7 @@ def predict_fold(
             checkpoint_path=model_path,
             config=config,
             map_location=map_location,
+            weights_only=False,
         )
         .model_ema.module.eval()
         .to(device)

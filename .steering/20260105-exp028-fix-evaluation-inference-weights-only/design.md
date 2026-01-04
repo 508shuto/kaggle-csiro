@@ -4,8 +4,8 @@
 `CSIROModule.load_from_checkpoint()`呼び出しにweights_only=Falseを追加する
 
 ## 変更コンポーネント
-- src/exp026/evaluation.py
-- src/exp026/inference.py
+- src/exp028/evaluation.py
+- src/exp028/inference.py
 
 ## 影響範囲
 - evaluation.py, inference.pyのチェックポイント読み込み処理
