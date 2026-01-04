@@ -94,7 +94,7 @@ def train_fold(config: DictConfig, df: pd.DataFrame, fold: int) -> None:
     last_ckpt = Path(config.dataset.output_dir) / "last.ckpt"
     if last_ckpt.exists():
         # epochはcheckpointファイルから取得（trainer.current_epochの+1ズレを避ける）
-        ckpt = torch.load(last_ckpt, map_location="cpu")
+        ckpt = torch.load(last_ckpt, map_location="cpu", weights_only=False)
         epoch = ckpt.get("epoch", trainer.current_epoch)
         if epoch is None:
             epoch = trainer.current_epoch
