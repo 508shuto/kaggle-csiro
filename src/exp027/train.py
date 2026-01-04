@@ -5,16 +5,29 @@ from pathlib import Path
 
 import pandas as pd
 import pytorch_lightning as L
+import torch
 import tyro
 import wandb
 from dataset import CSIRODataset
 from lightning_module import CSIROModule
 from omegaconf import DictConfig, OmegaConf
+from PIL import Image
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
 from pytorch_lightning.loggers import WandbLogger
 from torch.utils.data import DataLoader
 
 from utils import seed_everything
+
+
+def collate_fn(batch: list[tuple[Image.Image, torch.Tensor, torch.Tensor]]):
+    """Custom collate function for PIL images.
+
+    PIL images cannot be stacked with torch.stack(), so we keep them as a list.
+    """
+    images = [item[0] for item in batch]  # List[PIL.Image]
+    targets = torch.stack([item[1] for item in batch])
+    aux_targets = torch.stack([item[2] for item in batch])
+    return images, targets, aux_targets
 
 
 def train_fold(config: DictConfig, df: pd.DataFrame, fold: int) -> None:
@@ -33,6 +46,7 @@ def train_fold(config: DictConfig, df: pd.DataFrame, fold: int) -> None:
         drop_last=config.trainer.train.drop_last,
         prefetch_factor=config.trainer.train.prefetch_factor,
         persistent_workers=config.trainer.train.num_workers > 0,
+        collate_fn=collate_fn,
     )
     valid_loader = DataLoader(
         valid_dataset,
@@ -43,6 +57,7 @@ def train_fold(config: DictConfig, df: pd.DataFrame, fold: int) -> None:
         drop_last=config.trainer.valid.drop_last,
         prefetch_factor=config.trainer.valid.prefetch_factor,
         persistent_workers=config.trainer.valid.num_workers > 0,
+        collate_fn=collate_fn,
     )
 
     callbacks = [

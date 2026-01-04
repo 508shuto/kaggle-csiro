@@ -9,8 +9,17 @@ from dataset import CSIRODataset
 from lightning_module import CSIROModule
 from metrics import compute_metrics
 from omegaconf import DictConfig, OmegaConf
+from PIL import Image
 from torch.utils.data import DataLoader
 from tqdm import tqdm
+
+
+def collate_fn(batch: list[tuple[Image.Image, torch.Tensor, torch.Tensor]]):
+    """Custom collate function for PIL images."""
+    images = [item[0] for item in batch]  # List[PIL.Image]
+    targets = torch.stack([item[1] for item in batch])
+    aux_targets = torch.stack([item[2] for item in batch])
+    return images, targets, aux_targets
 
 
 def main(
@@ -46,6 +55,7 @@ def main(
             batch_size=config.trainer.valid.batch_size,
             shuffle=False,
             num_workers=config.trainer.valid.num_workers,
+            collate_fn=collate_fn,
         )
 
         checkpoints = list(model_dir.glob(f"fold{fold}*.ckpt"))
@@ -67,10 +77,10 @@ def main(
         fold_targets = []
         for batch in tqdm(dataloader, desc=f"Fold {fold}"):
             images, targets, _ = batch
-            images = images.to(device)
+            # images is a list of PIL images, targets is a tensor
             targets = targets.to(device)
             with torch.no_grad():
-                predictions, _ = model(images)
+                predictions, _ = model(images)  # model accepts PIL images
             fold_predictions.append(predictions.cpu().detach())
             fold_targets.append(targets.cpu().detach())
 

@@ -20,7 +20,11 @@ class CSIRODataset(Dataset):
         self.transform = self._get_transforms(mode)
 
     def _get_transforms(self, mode: str) -> T.Compose:
-        """Get torchvision transforms for VLM input."""
+        """Get torchvision transforms for VLM input.
+
+        Note: Returns PIL images without ToTensor/Normalize because
+        Qwen3VLImageProcessor handles the full preprocessing.
+        """
         image_size = (
             self.config.augmentation.train.image_size if mode == "train" else self.config.augmentation.valid.image_size
         )
@@ -37,18 +41,10 @@ class CSIRODataset(Dataset):
                 transform_list.append(T.RandomRotation(degrees=self.config.augmentation.train.rotation_limit))
             if self.config.augmentation.train.brightness_contrast:
                 transform_list.append(T.ColorJitter(brightness=0.2, contrast=0.2))
-            transform_list.extend(
-                [
-                    T.ToTensor(),
-                    # Qwen3-VL uses standard ImageNet normalization
-                    T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-                ]
-            )
+            # Note: No ToTensor/Normalize - Qwen3VLImageProcessor handles this
         else:
             transform_list = [
                 T.Resize((image_size, image_size)),
-                T.ToTensor(),
-                T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
             ]
 
         return T.Compose(transform_list)
@@ -56,7 +52,7 @@ class CSIRODataset(Dataset):
     def __len__(self):
         return len(self.df)
 
-    def __getitem__(self, idx: int) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    def __getitem__(self, idx: int) -> tuple[Image.Image, torch.Tensor, torch.Tensor]:
         row = self.df.iloc[idx]
         # Load image with PIL
         try:
@@ -64,7 +60,7 @@ class CSIRODataset(Dataset):
         except (FileNotFoundError, OSError) as e:
             raise RuntimeError(f"Failed to load image {row['image_path']}: {e}") from e
 
-        # Apply transforms
+        # Apply transforms (returns PIL image, not tensor)
         image = self.transform(image)
 
         # Get raw target values

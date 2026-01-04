@@ -12,7 +12,7 @@ model:
   name: "Qwen/Qwen3-VL-2B-Instruct"
   pretrained: true
   freeze_backbone: true
-  hidden_dim: 1536  # Qwen3-VL-2B hidden dimension
+  hidden_dim: 2048  # Qwen3-VL-2B out_hidden_size
   head_hidden_dim: 256
   dropout: 0.2
 
@@ -71,7 +71,7 @@ augmentation:
     rotation_limit: 20
     brightness_contrast: true
     mixup:
-      enabled: true
+      enabled: false  # Disabled: Mixup requires tensor input, not PIL images
       alpha: 0.2
       prob: 0.5
   valid:
