@@ -9,7 +9,7 @@ dataset:
   shuffle: true
 
 model:
-  name: "vit_base_patch14_dinov2.lvd142m"
+  name: "vit_base_patch16_dinov3"
   pretrained: true
   in_channels: 3
   freeze_backbone: true
@@ -64,7 +64,7 @@ trainer:
 
 augmentation:
   train:
-    image_size: 518  # DINOv2の推奨サイズ
+    image_size: 256  # DINOv3の推奨サイズ
     horizontal_flip: 0.5
     vertical_flip: 0.5
     rotation_limit: 20
@@ -80,6 +80,6 @@ augmentation:
       alpha: 0.2
       prob: 0.5
   valid:
-    image_size: 518  # DINOv2の推奨サイズ
+    image_size: 256  # DINOv3の推奨サイズ
     horizontal_flip: 0.0
     vertical_flip: 0.0

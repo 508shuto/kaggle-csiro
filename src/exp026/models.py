@@ -6,7 +6,7 @@ import torch.nn as nn
 class CSIROModel(nn.Module):
     def __init__(
         self,
-        model_name: str = "vit_base_patch14_dinov2.lvd142m",
+        model_name: str = "vit_base_patch16_dinov3",
         pretrained: bool = True,
         in_channels: int = 3,
         out_channels: int = 3,  # [clover, dead, green]
@@ -105,7 +105,7 @@ if __name__ == "__main__":
     import torch
 
     parser = ArgumentParser()
-    parser.add_argument("--model_name", type=str, default="vit_base_patch14_dinov2.lvd142m")
+    parser.add_argument("--model_name", type=str, default="vit_base_patch16_dinov3")
     parser.add_argument("--pretrained", type=bool, default=False)
     parser.add_argument("--in_channels", type=int, default=3)
     parser.add_argument("--freeze_backbone", action="store_true", default=True)
@@ -132,8 +132,8 @@ if __name__ == "__main__":
 
     batch_size = 4
     channels = 3
-    height = 518
-    width = 518
+    height = 256
+    width = 256
 
     dummy_input = torch.randn(batch_size, channels, height, width).to(device)
     with torch.no_grad():
