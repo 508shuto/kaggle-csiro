@@ -13,7 +13,7 @@
 - [x] Done: config/exp026.yamlの作成
 - [x] Done: doc/experiment/exp026.mdの作成
 - [x] Done: レビュー指摘事項の修正
-  - [x] エポック数を50に変更
   - [x] 画像サイズを224に変更
   - [x] 重複lr設定を削除
   - [x] ドキュメントをDINOv3に統一
+  - [x] エポック数を100に設定（ユーザー指定）
