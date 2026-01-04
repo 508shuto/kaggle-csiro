@@ -140,3 +140,19 @@ uv run ./src/expXXX/train.py --folds 0 1 2 3 4
 uv run ./src/expXXX/evaluation.py --device mps --model_dir ./output/expXXX
 uv run ./src/expXXX/inference.py --config-path ./config/expXXX.yaml --model-dir ./output/expXXX
 ```
+
+---
+
+## カスタムエージェント（.claude/agents/）
+
+| エージェント | 説明 | 呼び出し例 |
+|-------------|------|----------|
+| code-reviewer | 実験コードのレビュー（バグ、パフォーマンス、再現性など） | 「レビューして」「exp027をレビュー」 |
+| error-analyzer | エラーログ解析・原因特定 | 「エラーを解析して」「なぜ失敗したか」 |
+| web-summarizer | Web検索結果の要約レポート作成 | 「〇〇を調べて要約して」 |
+
+### 出力先
+
+- code-reviewer: `.log/review/YYYYMMDD-expXXX-full-review.md`
+- error-analyzer: `.log/error/YYYYMMDD-expXXX-[タスク名].md`
+- web-summarizer: `./reports/YYYY-MM-DD_topic.md`
