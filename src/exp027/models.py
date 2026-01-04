@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
-from PIL import Image
-from transformers import AutoImageProcessor, Qwen3VLForConditionalGeneration
+from transformers import Qwen3VLForConditionalGeneration
 
 
 class Qwen3VLRegressionModel(nn.Module):
@@ -41,9 +40,6 @@ class Qwen3VLRegressionModel(nn.Module):
         # Extract vision encoder
         self.vision_encoder = self.vlm.model.visual
 
-        # Initialize image processor
-        self.processor = AutoImageProcessor.from_pretrained(model_name)
-
         # Freeze backbone if specified
         self.freeze_backbone = freeze_backbone
         if freeze_backbone:
@@ -77,24 +73,17 @@ class Qwen3VLRegressionModel(nn.Module):
             nn.Linear(head_hidden_dim, aux_out_channels),
         )
 
-    def forward(self, images: list[Image.Image]):
+    def forward(self, pixel_values: torch.Tensor, grid_thw: torch.Tensor):
         """Forward pass.
 
         Args:
-            images: List of PIL images
+            pixel_values: Preprocessed image tensor from Dataset
+            grid_thw: Grid information tensor (B, 3)
 
         Returns:
             pred: Predictions of shape (B, 5) [Clover, Dead, Green, GDM, Total]
             aux_pred: Auxiliary predictions of shape (B, 2) [NDVI, Height]
         """
-        # Get device from model parameters
-        device = next(self.vlm.parameters()).device
-
-        # Process images with Qwen3VL processor
-        processed = self.processor(images=images, return_tensors="pt")
-        pixel_values = processed.pixel_values.to(device)
-        grid_thw = processed.image_grid_thw.to(device)
-
         # Extract vision features using get_image_features
         # Returns tuple: (image_embeds, deepstack_embeds)
         image_embeds, _ = self.vlm.model.get_image_features(
@@ -136,6 +125,8 @@ if __name__ == "__main__":
     from argparse import ArgumentParser
 
     import numpy as np
+    from PIL import Image
+    from transformers import AutoImageProcessor
 
     parser = ArgumentParser()
     parser.add_argument("--model_name", type=str, default="Qwen/Qwen3-VL-2B-Instruct")
@@ -151,7 +142,8 @@ if __name__ == "__main__":
     ).to(device)
     model.eval()
 
-    # Create dummy PIL images
+    # Create dummy PIL images and process with AutoImageProcessor
+    processor = AutoImageProcessor.from_pretrained(args.model_name)
     batch_size = 2
     height = 384
     width = 384
@@ -159,8 +151,11 @@ if __name__ == "__main__":
     dummy_images = [
         Image.fromarray(np.random.randint(0, 255, (height, width, 3), dtype=np.uint8)) for _ in range(batch_size)
     ]
+    processed = processor(images=dummy_images, return_tensors="pt")
+    pixel_values = processed.pixel_values.to(device)
+    grid_thw = processed.image_grid_thw.to(device)
 
     with torch.no_grad():
-        pred, aux_pred = model(dummy_images)
+        pred, aux_pred = model(pixel_values, grid_thw)
     print(f"pred shape: {pred.shape}")  # Expected: (2, 5)
     print(f"aux_pred shape: {aux_pred.shape}")  # Expected: (2, 2)

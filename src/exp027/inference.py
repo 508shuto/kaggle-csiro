@@ -11,11 +11,14 @@ from PIL import Image
 from torch.utils.data import DataLoader, Dataset
 from torchvision import transforms as T
 from tqdm import tqdm
+from transformers import AutoImageProcessor
 
 
-def collate_fn(batch: list[Image.Image]) -> list[Image.Image]:
-    """Custom collate function for PIL images in test dataset."""
-    return batch
+def collate_fn(batch: list[tuple[torch.Tensor, torch.Tensor]]) -> tuple[torch.Tensor, torch.Tensor]:
+    """Collate function for preprocessed tensors."""
+    pixel_values = torch.stack([item[0] for item in batch])
+    grid_thw = torch.stack([item[1] for item in batch])
+    return pixel_values, grid_thw
 
 
 def detect_device(device: str) -> str:
@@ -78,12 +81,12 @@ class TestDataset(Dataset):
         self.mode = mode
         self.config = config
         self.transform = self._get_transforms()
+        self.processor = AutoImageProcessor.from_pretrained(config.model.name)
 
     def _get_transforms(self) -> T.Compose:
         """Get transforms for test data.
 
-        Note: Returns PIL images without ToTensor/Normalize because
-        Qwen3VLImageProcessor handles the full preprocessing.
+        Note: Only PIL-level augmentations. Processor handles resize/normalize.
         """
         image_size = self.config.augmentation.valid.image_size
         return T.Compose(
@@ -95,7 +98,7 @@ class TestDataset(Dataset):
     def __len__(self):
         return len(self.df)
 
-    def __getitem__(self, idx: int) -> Image.Image:
+    def __getitem__(self, idx: int) -> tuple[torch.Tensor, torch.Tensor]:
         row = self.df.iloc[idx]
         # Load image with PIL
         try:
@@ -103,7 +106,13 @@ class TestDataset(Dataset):
         except (FileNotFoundError, OSError) as e:
             raise RuntimeError(f"Failed to load image {row['image_path']}: {e}") from e
         image = self.transform(image)
-        return image
+
+        # Process with Qwen3VL processor
+        processed = self.processor(images=image, return_tensors="pt")
+        pixel_values = processed.pixel_values.squeeze(0)
+        grid_thw = processed.image_grid_thw.squeeze(0)
+
+        return pixel_values, grid_thw
 
 
 def predict_fold(
@@ -123,7 +132,7 @@ def predict_fold(
         batch_size=batch_size,
         shuffle=False,
         num_workers=num_workers,
-        pin_memory=False,  # Cannot pin PIL images
+        pin_memory=device.startswith("cuda"),  # Can now pin tensors
         prefetch_factor=2 if num_workers > 0 else None,
         persistent_workers=num_workers > 0,
         collate_fn=collate_fn,
@@ -170,42 +179,35 @@ def predict(
     Args:
         fold: Fold number for logging
         model: Model to use for prediction
-        dataloader: DataLoader for test data (returns PIL images)
+        dataloader: DataLoader for test data (returns preprocessed tensors)
         device: Device to run on
         use_amp: Whether to use automatic mixed precision
-        use_tta: Whether to use test time augmentation (NOT SUPPORTED for PIL input)
+        use_tta: Whether to use test time augmentation
 
     Returns:
         Array of predictions shape (N, 5)
     """
     if use_tta:
-        print("Warning: TTA is not supported with PIL image input. Ignoring use_tta=True.")
+        print("Warning: TTA is not yet implemented. Ignoring use_tta=True.")
 
     fold_predictions = []
     device_type = "cuda" if device.startswith("cuda") else ("mps" if device.startswith("mps") else "cpu")
 
-    for images in tqdm(dataloader, desc=f"Fold {fold}"):
-        # images is a list of PIL images
-        batch_predictions = []
+    for pixel_values, grid_thw in tqdm(dataloader, desc=f"Fold {fold}"):
+        pixel_values = pixel_values.to(device)
+        grid_thw = grid_thw.to(device)
 
         # Main prediction
         with torch.no_grad():
             if use_amp and device_type == "cuda":
                 with torch.amp.autocast(device_type=device_type):
-                    pred, _ = model(images)
+                    pred, _ = model(pixel_values, grid_thw)
             else:
-                pred, _ = model(images)
-            batch_predictions.append(pred.cpu().detach())
+                pred, _ = model(pixel_values, grid_thw)
 
         # Clamp to non-negative
-        batch_predictions_processed = []
-        for pred_tensor in batch_predictions:
-            pred_processed = torch.clamp(pred_tensor, min=0.0)
-            batch_predictions_processed.append(pred_processed.numpy())
-
-        # Average predictions (single prediction per batch for now)
-        batch_pred = np.mean(batch_predictions_processed, axis=0)
-        fold_predictions.append(batch_pred)
+        pred = torch.clamp(pred, min=0.0)
+        fold_predictions.append(pred.cpu().numpy())
 
     fold_predictions = np.concatenate(fold_predictions, axis=0)
     return fold_predictions

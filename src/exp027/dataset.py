@@ -4,6 +4,7 @@ from omegaconf import DictConfig
 from PIL import Image
 from torch.utils.data import Dataset
 from torchvision import transforms as T
+from transformers import AutoImageProcessor
 
 
 class CSIRODataset(Dataset):
@@ -18,6 +19,7 @@ class CSIRODataset(Dataset):
         self.df = df
         self.mode = mode
         self.transform = self._get_transforms(mode)
+        self.processor = AutoImageProcessor.from_pretrained(config.model.name)
 
     def _get_transforms(self, mode: str) -> T.Compose:
         """Get torchvision transforms for VLM input.
@@ -52,7 +54,7 @@ class CSIRODataset(Dataset):
     def __len__(self):
         return len(self.df)
 
-    def __getitem__(self, idx: int) -> tuple[Image.Image, torch.Tensor, torch.Tensor]:
+    def __getitem__(self, idx: int) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         row = self.df.iloc[idx]
         # Load image with PIL
         try:
@@ -62,6 +64,11 @@ class CSIRODataset(Dataset):
 
         # Apply transforms (returns PIL image, not tensor)
         image = self.transform(image)
+
+        # Process with Qwen3VL processor (resize + normalize + convert to tensor)
+        processed = self.processor(images=image, return_tensors="pt")
+        pixel_values = processed.pixel_values.squeeze(0)  # Remove batch dim
+        grid_thw = processed.image_grid_thw.squeeze(0)  # Remove batch dim
 
         # Get raw target values
         target = torch.tensor(
@@ -84,4 +91,4 @@ class CSIRODataset(Dataset):
             dtype=torch.float32,
         )
 
-        return image, target, aux_target
+        return pixel_values, grid_thw, target, aux_target

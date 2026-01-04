@@ -54,21 +54,23 @@ class CSIROModule(L.LightningModule):
         self.mixup_alpha = config.augmentation.train.get("mixup", {}).get("alpha", 0.2)
         self.mixup_prob = config.augmentation.train.get("mixup", {}).get("prob", 0.5)
 
-    def forward(self, x):
-        return self.model(x)
+    def forward(self, pixel_values, grid_thw):
+        return self.model(pixel_values, grid_thw)
 
     def training_step(self, batch, batch_idx):
         self.model_ema.update(self.model, self.global_step)
 
-        image, targets, aux_targets = batch
+        pixel_values, grid_thw, targets, aux_targets = batch
 
-        # Apply Mixup
+        # Apply Mixup (now works with tensor inputs)
         if self.mixup_enabled and torch.rand(1).item() < self.mixup_prob:
-            image, targets, aux_targets, lam = mixup_batch(image, targets, aux_targets, alpha=self.mixup_alpha)
+            pixel_values, targets, aux_targets, lam = mixup_batch(
+                pixel_values, targets, aux_targets, alpha=self.mixup_alpha
+            )
             self.log("train_mixup_lambda", lam, on_step=False, on_epoch=True)
 
         # Forward pass (raw space)
-        preds, aux_preds = self.model(image)
+        preds, aux_preds = self.model(pixel_values, grid_thw)
         loss = self.loss_fn(preds, targets) + self.aux_weight * self.aux_loss_fn(aux_preds, aux_targets)
 
         self.log("train_loss", loss, prog_bar=True, on_step=False, on_epoch=True)
@@ -82,10 +84,10 @@ class CSIROModule(L.LightningModule):
         return loss
 
     def validation_step(self, batch, batch_idx):
-        image, targets, aux_targets = batch
+        pixel_values, grid_thw, targets, aux_targets = batch
 
         # Forward pass with EMA model (raw space)
-        preds, aux_preds = self.model_ema.module(image)  # (B, 5), (B, 2)
+        preds, aux_preds = self.model_ema.module(pixel_values, grid_thw)  # (B, 5), (B, 2)
 
         # Compute loss in raw space
         loss = self.loss_fn(preds, targets) + self.aux_weight * self.aux_loss_fn(aux_preds, aux_targets)
