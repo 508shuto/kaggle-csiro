@@ -13,8 +13,8 @@
   - on_validation_epoch_endで以下をログ:
     - `val_rmse`: 全体のRMSE
     - `val_mae`: 全体のMAE
-    - `val_rmse_{class_name}`: クラスごとのRMSE（Ca, P, pH, SOC, Sand）
-    - `val_mae_{class_name}`: クラスごとのMAE（Ca, P, pH, SOC, Sand）
+    - `val_rmse_{class_name}`: クラスごとのRMSE（Dry_Clover, Dry_Dead, Dry_Green, GDM, Dry_Total）
+    - `val_mae_{class_name}`: クラスごとのMAE（Dry_Clover, Dry_Dead, Dry_Green, GDM, Dry_Total）
 
 ## 影響範囲
 - W&B/TensorBoardに新しいメトリクス（val_rmse, val_mae, val_rmse_*, val_mae_*）が追加される
