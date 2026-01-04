@@ -25,12 +25,12 @@ Output (B, 5) [Clover, Dead, Green, GDM, Total]
 ## 変更コンポーネント
 | ファイル | 変更内容 |
 |---------|---------|
-| config/exp026.yaml | Qwen3-VL用設定（モデル名、画像サイズ等） |
+| config/exp027.yaml | Qwen3-VL用設定（モデル名、画像サイズ等） |
 | models.py | Qwen3VLRegressionModel クラス（VLM特徴抽出+回帰ヘッド） |
 | dataset.py | VLM用入力形式（ProcessorでのTokenize不要、画像のみ） |
 | utils.py | VLM用transform（Qwen3-VLのデフォルト正規化） |
 | その他 | exp025から流用（train, eval, inference, loss, metrics） |
 
 ## 影響範囲
-- 新規実験としてexp026を作成
+- 新規実験としてexp027を作成
 - 既存コードへの影響なし
