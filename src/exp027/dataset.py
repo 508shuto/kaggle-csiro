@@ -1,4 +1,3 @@
-import numpy as np
 import pandas as pd
 import torch
 from omegaconf import DictConfig
@@ -23,9 +22,7 @@ class CSIRODataset(Dataset):
     def _get_transforms(self, mode: str) -> T.Compose:
         """Get torchvision transforms for VLM input."""
         image_size = (
-            self.config.augmentation.train.image_size
-            if mode == "train"
-            else self.config.augmentation.valid.image_size
+            self.config.augmentation.train.image_size if mode == "train" else self.config.augmentation.valid.image_size
         )
 
         if mode == "train":
@@ -37,18 +34,16 @@ class CSIRODataset(Dataset):
             if self.config.augmentation.train.vertical_flip > 0:
                 transform_list.append(T.RandomVerticalFlip(p=self.config.augmentation.train.vertical_flip))
             if self.config.augmentation.train.rotation_limit > 0:
-                transform_list.append(
-                    T.RandomRotation(degrees=self.config.augmentation.train.rotation_limit)
-                )
+                transform_list.append(T.RandomRotation(degrees=self.config.augmentation.train.rotation_limit))
             if self.config.augmentation.train.brightness_contrast:
-                transform_list.append(
-                    T.ColorJitter(brightness=0.2, contrast=0.2)
-                )
-            transform_list.extend([
-                T.ToTensor(),
-                # Qwen3-VL uses standard ImageNet normalization
-                T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-            ])
+                transform_list.append(T.ColorJitter(brightness=0.2, contrast=0.2))
+            transform_list.extend(
+                [
+                    T.ToTensor(),
+                    # Qwen3-VL uses standard ImageNet normalization
+                    T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+                ]
+            )
         else:
             transform_list = [
                 T.Resize((image_size, image_size)),

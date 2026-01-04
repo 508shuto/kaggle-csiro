@@ -77,11 +77,13 @@ class TestDataset(Dataset):
     def _get_transforms(self) -> T.Compose:
         """Get transforms for test data."""
         image_size = self.config.augmentation.valid.image_size
-        return T.Compose([
-            T.Resize((image_size, image_size)),
-            T.ToTensor(),
-            T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-        ])
+        return T.Compose(
+            [
+                T.Resize((image_size, image_size)),
+                T.ToTensor(),
+                T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+            ]
+        )
 
     def __len__(self):
         return len(self.df)

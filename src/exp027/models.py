@@ -54,9 +54,9 @@ class Qwen3VLRegressionModel(nn.Module):
 
         # Validate hidden dimension matches vision encoder output
         actual_hidden_dim = self.vision_encoder.config.hidden_size
-        assert (
-            hidden_dim == actual_hidden_dim
-        ), f"Config hidden_dim ({hidden_dim}) must match Qwen3-VL output ({actual_hidden_dim})"
+        assert hidden_dim == actual_hidden_dim, (
+            f"Config hidden_dim ({hidden_dim}) must match Qwen3-VL output ({actual_hidden_dim})"
+        )
 
         # Get hidden dimension from vision encoder
         self.hidden_dim = hidden_dim
