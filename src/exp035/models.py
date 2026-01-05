@@ -10,7 +10,7 @@ class CSIROModel(nn.Module):
         model_name: str = "vit_large_patch16_dinov3.lvd1689m",
         pretrained: bool = True,
         in_channels: int = 3,
-        out_channels: int = 3,  # [clover, dead, green]
+        out_channels: int = 3,  # Head output: [clover, dead, green]. Model outputs 5 after constraint expansion.
         aux_out_channels: int = 2,
         freeze_backbone: bool = True,
     ):
@@ -102,6 +102,9 @@ class CSIROModel(nn.Module):
             pred: (B, 5) predictions [Clover, Dead, Green, GDM, Total]
             aux_pred: (B, 2) auxiliary predictions
         """
+        # Input validation
+        assert x.size(2) == 1024 and x.size(3) == 1024, f"Expected 1024x1024 input, got {x.shape}"
+
         B = x.size(0)
 
         # Global branch: resize to 512x512
@@ -118,8 +121,9 @@ class CSIROModel(nn.Module):
         tiles.append(x[:, :, 512:, :512])  # bottom-left
         tiles.append(x[:, :, 512:, 512:])  # bottom-right
 
-        # Stack tiles: (B*4, 3, 512, 512)
-        tiles = torch.cat(tiles, dim=0)  # (B*4, 3, 512, 512)
+        # Stack tiles: (B, 4, 3, 512, 512) -> (B*4, 3, 512, 512)
+        tiles = torch.stack(tiles, dim=1)  # (B, 4, 3, 512, 512)
+        tiles = tiles.view(-1, 3, 512, 512)  # (B*4, 3, 512, 512)
 
         # Extract features and predict for all tiles at once
         feat_tiles = self._extract_features(tiles)  # (B*4, C)
