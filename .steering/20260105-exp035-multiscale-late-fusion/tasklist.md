@@ -8,8 +8,8 @@
 ## タスク
 
 ### 1. ディレクトリ・ファイル準備
-- [ ] TODO: `src/exp035/` ディレクトリ作成
-- [ ] TODO: exp028から基本ファイルをコピー
+- [x] Done: `src/exp035/` ディレクトリ作成
+- [x] Done: exp028から基本ファイルをコピー
   - train.py
   - evaluation.py
   - inference.py
@@ -17,18 +17,19 @@
   - dataset.py
 
 ### 2. モデル実装
-- [ ] TODO: `src/exp035/models.py` - マルチスケールモデル実装
+- [x] Done: `src/exp035/models.py` - マルチスケールモデル実装
   - Global branch (512×512)
   - Tile branch (512×512 × 4)
   - Late Fusion
 
 ### 3. データセット修正
-- [ ] TODO: `src/exp035/dataset.py` - 1024×1024リサイズ対応
+- [x] Done: `src/exp035/dataset.py` - 1024×1024リサイズ対応（config経由）
 
 ### 4. 設定ファイル
-- [ ] TODO: `config/exp035.yaml` 作成
+- [x] Done: `config/exp035.yaml` 作成
   - image_size: 1024
-  - use_multiscale: true
+  - batch_size: 4（メモリ考慮）
+  - accumulate_grad_batches: 4（effective batch size = 16）
 
 ### 5. 実験実行
 - [ ] TODO: 5-fold学習実行
