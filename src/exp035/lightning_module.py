@@ -87,10 +87,6 @@ class CSIROModule(L.LightningModule):
         # raw空間でLoss計算
         loss = self.loss_fn(preds, targets) + self.aux_weight * self.aux_loss_fn(aux_preds, aux_targets)
 
-        # 負値を除去（念のため）
-        preds = torch.clamp(preds, min=0.0)
-        aux_preds = torch.clamp(aux_preds, min=0.0)
-
         # メトリクスはraw空間で計算
         self.metrics.update(preds, targets)
         self.aux_metrics.update(aux_preds, aux_targets)
@@ -99,8 +95,8 @@ class CSIROModule(L.LightningModule):
         if not hasattr(self, "val_preds"):
             self.val_preds = []
             self.val_targets = []
-        self.val_preds.append(preds)
-        self.val_targets.append(targets)
+        self.val_preds.append(preds.detach())
+        self.val_targets.append(targets.detach())
 
         self.log("val_loss", loss, prog_bar=True, on_step=False, on_epoch=True)
         self.log(

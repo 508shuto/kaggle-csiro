@@ -126,11 +126,11 @@ class CSIROModel(nn.Module):
         pred_tiles, aux_tiles = self._predict_from_features(feat_tiles)  # (B*4, 3), (B*4, 2)
 
         # Reshape and average over tiles
-        pred_tiles = pred_tiles.view(4, B, 3)  # (4, B, 3)
-        pred_tile_avg = pred_tiles.mean(dim=0)  # (B, 3)
+        pred_tiles = pred_tiles.view(B, 4, 3)  # (B, 4, 3)
+        pred_tile_avg = pred_tiles.mean(dim=1)  # (B, 3)
 
-        aux_tiles = aux_tiles.view(4, B, 2)  # (4, B, 2)
-        aux_tile_avg = aux_tiles.mean(dim=0)  # (B, 2)
+        aux_tiles = aux_tiles.view(B, 4, 2)  # (B, 4, 2)
+        aux_tile_avg = aux_tiles.mean(dim=1)  # (B, 2)
 
         # Late Fusion: average of global and tile predictions
         pred_3 = (pred_global + pred_tile_avg) / 2  # (B, 3)
