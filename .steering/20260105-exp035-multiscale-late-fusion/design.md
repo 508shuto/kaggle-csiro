@@ -52,3 +52,27 @@ CSIROModel (exp035)
   for tile in tiles:
       pred = predict(tile)
   ```
+
+## 実装上の修正履歴
+
+### バグ修正（commit: 3b52cce）
+1. **Critical: Reshape bug** (models.py:129)
+   - 誤: `pred_tiles.view(4, B, 3)` → 正: `pred_tiles.view(B, 4, 3)`
+   - 影響: 異なる画像のタイルが混ざって平均されていた
+2. **Memory leak** (lightning_module.py:102-103)
+   - validation時に `.detach()` 追加
+3. **Redundant clamping** (lightning_module.py:90-91)
+   - モデル側で実施済みのため削除
+
+### 設計変更（commit: a253bbd, a298fa0）
+1. **Input validation追加** (models.py:106)
+   - 1024x1024入力を強制チェック
+2. **Validation pattern改善** (lightning_module.py:81-84)
+   - `on_validation_epoch_start()` フック使用
+3. **Auxiliary loss weight validation** (lightning_module.py:48-55)
+   - `aux_weight > 1.0` で警告
+4. **Augmentation設定統一** (config/exp035.yaml)
+   - bool → float (確率値) に統一
+   - gamma_transform, gaussian_noise, blur を実装
+5. **Mixup無効化** (config/exp035.yaml:77)
+   - マルチスケールアーキテクチャと非互換のため `enabled: false`
