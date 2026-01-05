@@ -148,11 +148,13 @@ uv run ./src/expXXX/inference.py --config-path ./config/expXXX.yaml --model-dir 
 | エージェント | 説明 | 呼び出し例 |
 |-------------|------|----------|
 | code-reviewer | 実験コードのレビュー（バグ、パフォーマンス、再現性など） | 「レビューして」「exp027をレビュー」 |
+| data-analyzer | EDA（探索的データ分析）・データの分布/欠損値/相関分析 | 「EDAして」「データ分析」「train.csvを分析」 |
 | error-analyzer | エラーログ解析・原因特定 | 「エラーを解析して」「なぜ失敗したか」 |
 | web-summarizer | Web検索結果の要約レポート作成 | 「〇〇を調べて要約して」 |
 
 ### 出力先
 
 - code-reviewer: `.log/review/YYYYMMDD-expXXX-full-review.md`
+- data-analyzer: `.log/eda/YYYYMMDD-[データセット名]-eda.md`
 - error-analyzer: `.log/error/YYYYMMDD-expXXX-[タスク名].md`
 - web-summarizer: `./reports/YYYY-MM-DD_topic.md`
