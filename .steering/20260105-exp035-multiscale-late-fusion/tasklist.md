@@ -1,9 +1,9 @@
 # Tasklist
 
 ## 完了条件（Definition of Done）
-- [ ] exp035のコードが実装され、エラーなく動作する
-- [ ] 5-fold CVが完了し、スコアが記録される
-- [ ] exp028との比較結果がドキュメントに記載される
+- [x] Done: exp035のコードが実装され、エラーなく動作する（バグ修正完了）
+- [ ] TODO: 5-fold CVが完了し、スコアが記録される
+- [ ] TODO: exp028との比較結果がドキュメントに記載される
 
 ## タスク
 
@@ -37,5 +37,6 @@
 - [ ] TODO: 結果をドキュメントに記録
 
 ### 6. 分析・ドキュメント
+- [x] Done: `doc/experiment/exp035.md` 作成（結果はCV実行後に記入）
 - [ ] TODO: exp028との比較分析
-- [ ] TODO: `doc/experiment/exp035.md` 結果・考察記入
+- [ ] TODO: CV結果を `doc/experiment/exp035.md` に記入
