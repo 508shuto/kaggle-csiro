@@ -45,6 +45,14 @@ class CSIROModule(L.LightningModule):
             }
         )
         self.aux_weight = config.aux_loss.weight
+        # Validate aux_weight
+        if self.aux_weight > 1.0:
+            import warnings
+
+            warnings.warn(
+                f"aux_weight ({self.aux_weight}) > 1.0 may cause auxiliary loss to dominate training. "
+                "Consider using a smaller value (e.g., 0.1-0.5)."
+            )
 
         # Mixup設定
         self.mixup_enabled = config.augmentation.train.get("mixup", {}).get("enabled", False)
@@ -78,6 +86,11 @@ class CSIROModule(L.LightningModule):
         )
         return loss
 
+    def on_validation_epoch_start(self):
+        """Initialize validation metrics at the start of each validation epoch."""
+        self.val_preds = []
+        self.val_targets = []
+
     def validation_step(self, batch, batch_idx):
         image, targets, aux_targets = batch
 
@@ -92,9 +105,6 @@ class CSIROModule(L.LightningModule):
         self.aux_metrics.update(aux_preds, aux_targets)
 
         # Per-class RMSE/MAE計算のためにバッチごとのpreds/targetsを保存
-        if not hasattr(self, "val_preds"):
-            self.val_preds = []
-            self.val_targets = []
         self.val_preds.append(preds.detach())
         self.val_targets.append(targets.detach())
 
@@ -113,7 +123,7 @@ class CSIROModule(L.LightningModule):
         aux_metrics = self.aux_metrics.compute()
 
         # Per-class RMSE/MAE計算
-        if hasattr(self, "val_preds") and len(self.val_preds) > 0:
+        if len(self.val_preds) > 0:
             all_preds = torch.cat(self.val_preds, dim=0)  # (N, 5)
             all_targets = torch.cat(self.val_targets, dim=0)  # (N, 5)
 
@@ -127,10 +137,6 @@ class CSIROModule(L.LightningModule):
                 # Per-class MAE
                 class_mae = torch.mean(torch.abs(all_preds[:, i] - all_targets[:, i]))
                 self.log(f"val_mae_{class_name}", class_mae)
-
-            # リストをクリア
-            self.val_preds = []
-            self.val_targets = []
 
         # R2スコアの処理
         if "r2_score" in metrics:
@@ -165,6 +171,7 @@ class CSIROModule(L.LightningModule):
         if "mae" in metrics:
             self.log("val_mae", metrics["mae"])
 
+        # Reset metrics (done automatically by MetricCollection but explicit for clarity)
         self.metrics.reset()
         self.aux_metrics.reset()
 
