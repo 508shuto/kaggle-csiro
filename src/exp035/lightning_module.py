@@ -51,7 +51,8 @@ class CSIROModule(L.LightningModule):
 
             warnings.warn(
                 f"aux_weight ({self.aux_weight}) > 1.0 may cause auxiliary loss to dominate training. "
-                "Consider using a smaller value (e.g., 0.1-0.5)."
+                "Consider using a smaller value (e.g., 0.1-0.5).",
+                stacklevel=2,
             )
 
         # Mixup設定

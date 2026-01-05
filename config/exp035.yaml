@@ -68,13 +68,13 @@ augmentation:
     rotation_limit: 20
     shift_limit: 0.1
     scale_limit: 0.2
-    elastic_transform: true
-    brightness_contrast: true
-    gamma_transform: true
-    gaussian_noise: true
-    blur: true
+    elastic_transform: 0.2
+    brightness_contrast: 0.2
+    gamma_transform: 0.2
+    gaussian_noise: 0.2
+    blur: 0.2
     mixup:
-      enabled: true
+      enabled: false  # multiscaleとの相性が悪いため無効化（PR #18 指摘対応）
       alpha: 0.2
       prob: 0.5
   valid:

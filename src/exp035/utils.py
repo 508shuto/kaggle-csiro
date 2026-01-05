@@ -60,38 +60,65 @@ def get_transforms(mode: str, config: DictConfig) -> A.Compose:
     assert mode in ["train", "valid", "test"]
 
     if mode == "train":
+        train_aug = config.augmentation.train
         augmentations = [
             A.Resize(
-                height=config.augmentation.train.image_size,
-                width=config.augmentation.train.image_size,
+                height=train_aug.image_size,
+                width=train_aug.image_size,
                 p=1.0,
             )
         ]
-        if config.augmentation.train.horizontal_flip > 0:
-            augmentations.append(A.HorizontalFlip(p=config.augmentation.train.horizontal_flip))
-        if config.augmentation.train.vertical_flip > 0:
-            augmentations.append(A.VerticalFlip(p=config.augmentation.train.vertical_flip))
-        if config.augmentation.train.rotation_limit > 0:
+        if train_aug.horizontal_flip > 0:
+            augmentations.append(A.HorizontalFlip(p=float(train_aug.horizontal_flip)))
+        if train_aug.vertical_flip > 0:
+            augmentations.append(A.VerticalFlip(p=float(train_aug.vertical_flip)))
+        if train_aug.rotation_limit > 0:
             augmentations.append(
                 A.Rotate(
-                    limit=config.augmentation.train.rotation_limit,
+                    limit=train_aug.rotation_limit,
                     p=0.2,
                 )
             )
-        if config.augmentation.train.elastic_transform > 0:
+        p_elastic = float(train_aug.get("elastic_transform", 0.0))
+        if p_elastic > 0:
             augmentations.append(
                 A.ElasticTransform(
                     alpha=1,
                     sigma=50,
-                    p=0.2,
+                    p=p_elastic,
                 )
             )
-        if config.augmentation.train.brightness_contrast:
+        p_brightness_contrast = float(train_aug.get("brightness_contrast", 0.0))
+        if p_brightness_contrast > 0:
             augmentations.append(
                 A.RandomBrightnessContrast(
                     brightness_limit=0.2,
                     contrast_limit=0.2,
-                    p=0.2,
+                    p=p_brightness_contrast,
+                )
+            )
+        p_gamma = float(train_aug.get("gamma_transform", 0.0))
+        if p_gamma > 0:
+            augmentations.append(
+                A.RandomGamma(
+                    gamma_limit=(80, 120),
+                    p=p_gamma,
+                )
+            )
+        p_gaussian_noise = float(train_aug.get("gaussian_noise", 0.0))
+        if p_gaussian_noise > 0:
+            augmentations.append(
+                A.GaussNoise(
+                    var_limit=(10.0, 50.0),
+                    p=p_gaussian_noise,
+                )
+            )
+        p_blur = float(train_aug.get("blur", 0.0))
+        if p_blur > 0:
+            augmentations.append(
+                A.Blur(
+                    blur_limit=3,
+                    p=p_blur,
                 )
             )
         augmentations.append(
@@ -103,14 +130,14 @@ def get_transforms(mode: str, config: DictConfig) -> A.Compose:
             )
         )
         augmentations.append(ToTensorV2(p=1.0))
-        print(augmentations)
         return A.Compose(augmentations, p=1.0, seed=config.experiment.seed)
     else:
+        valid_aug = config.augmentation.valid
         return A.Compose(
             [
                 A.Resize(
-                    height=config.augmentation.valid.image_size,
-                    width=config.augmentation.valid.image_size,
+                    height=valid_aug.image_size,
+                    width=valid_aug.image_size,
                     p=1.0,
                 ),
                 A.Normalize(
