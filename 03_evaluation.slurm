@@ -19,4 +19,4 @@ srun docker run --gpus all --rm \
 -e WANDB_API_KEY=${WANDB_API_KEY} \
 -e KAGGLE_USERNAME=${KAGGLE_USERNAME} \
 -e KAGGLE_KEY=${KAGGLE_KEY} \
-shuto.goya/kaggle-csiro:latest uv run src/${EXP_NAME}/evaluation.py
+shuto.goya/kaggle-csiro:latest uv run src/${EXP_NAME}/evaluation.py --model_dir ./output/${EXP_NAME}
