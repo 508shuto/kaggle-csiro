@@ -62,3 +62,5 @@ else:
 - LoRA の一部パラメータや EMA のパラメータが `training_step` で直接参照されない場合がある
 - `find_unused_parameters=True` により、これらのパラメータも正しく処理される
 
+
+
