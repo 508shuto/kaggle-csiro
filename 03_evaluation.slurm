@@ -16,6 +16,7 @@ srun docker run --gpus all --rm \
 --shm-size=8gb \
 -v $(pwd):/app \
 -w /app \
+-e HF_TOKEN=${HF_TOKEN} \
 -e WANDB_API_KEY=${WANDB_API_KEY} \
 -e KAGGLE_USERNAME=${KAGGLE_USERNAME} \
 -e KAGGLE_KEY=${KAGGLE_KEY} \
