@@ -33,6 +33,13 @@ def main(exp_name: str):
         shutil.copy(file, tmp_dir)
     # copy config
     shutil.copy(config_path, tmp_dir / "config.yaml")
+    # copy model snapshot if exists
+    model_snapshot_dir = Path(weights_dir) / "model"
+    if model_snapshot_dir.exists() and model_snapshot_dir.is_dir():
+        print(f"Copying model snapshot from {model_snapshot_dir} to {tmp_dir / 'model'}")
+        shutil.copytree(model_snapshot_dir, tmp_dir / "model", dirs_exist_ok=True)
+    else:
+        print(f"Warning: Model snapshot directory {model_snapshot_dir} not found. Skipping.")
     # upload
     upload_dataset(model_dataset_name, str(tmp_dir))
     shutil.rmtree(tmp_dir)
