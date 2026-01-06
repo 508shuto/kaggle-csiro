@@ -10,3 +10,5 @@
 - `train_fold()` 関数のみの変更で、他の関数やモジュールへの影響はなし
 - DDP環境でのみ影響があり、シングルGPU環境では動作に変化なし（`trainer.is_global_zero` は常にTrue）
 
+
+
