@@ -11,3 +11,4 @@ exp037のDINOv2をHF DINOv3に置き換え、最新のバックボーンでLoRA�
 ## 制約・前提条件
 - transformers mainブランチが必要な場合あり（DINOv3サポート）
 - 画像サイズ: 512x512
+- DINOv3はgated repoのため、Hugging Face認証が必要（`HF_TOKEN`環境変数）

@@ -12,6 +12,7 @@
 - [x] Done: steeringドキュメント作成
 - [x] Done: 実験ドキュメント作成
 - [x] Done: 動作検証（919K trainable params確認）
+- [x] Done: `.env.example`追加、SLURMスクリプトで`HF_TOKEN`等を環境変数として注入
 - [ ] TODO: 本番学習
 
 ## 検証結果

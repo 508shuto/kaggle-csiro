@@ -23,3 +23,7 @@
 ## 注意点
 - DINOv3はgated repo（HFログイン必要）
 - peftの`layers_to_transform`はDINOv3で動作しないため正規表現を使用
+
+## 認証設定
+- `.env`ファイルで`HF_TOKEN`を管理（`.gitignore`で除外）
+- SLURM実行時は`docker run`の`-e HF_TOKEN=${HF_TOKEN}`のように環境変数を明示的に渡す
