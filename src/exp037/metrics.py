@@ -65,12 +65,25 @@ class WeightedR2Score(Metric):
         Returns:
             torch.Tensor: Globally weighted R2 score (scalar)
         """
-        if len(self.preds) == 0:
-            return torch.tensor(0.0, device=self.weights.device)
+        # 空の state チェック（list と Tensor の両方に対応）
+        if isinstance(self.preds, list):
+            if len(self.preds) == 0:
+                return torch.tensor(0.0, device=self.weights.device)
+        else:
+            if self.preds.numel() == 0:
+                return torch.tensor(0.0, device=self.weights.device)
 
-        # すべてのバッチを結合
-        preds = torch.cat(self.preds, dim=0)  # (N, 5)
-        targets = torch.cat(self.targets, dim=0)  # (N, 5)
+        # DDP環境では dist_reduce_fx="cat" により state が Tensor に変換される可能性がある
+        # list の場合は結合、Tensor の場合はそのまま使用
+        if isinstance(self.preds, list):
+            preds = torch.cat(self.preds, dim=0)  # (N, 5)
+        else:
+            preds = self.preds  # 既に Tensor
+
+        if isinstance(self.targets, list):
+            targets = torch.cat(self.targets, dim=0)  # (N, 5)
+        else:
+            targets = self.targets  # 既に Tensor
 
         # Flatten: row-major order (サンプルごとに5つのターゲットを順番に並べる)
         y_pred = preds.flatten()  # shape: (N*5,) [s0_t0, s0_t1, s0_t2, s0_t3, s0_t4, s1_t0, ...]
