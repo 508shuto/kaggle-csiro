@@ -209,27 +209,6 @@ def render_overview_tab(df: pd.DataFrame, results: dict | None):
     """Render Overview tab content."""
     st.header("Overview")
 
-    # KPI Metrics
-    col1, col2, col3, col4 = st.columns(4)
-
-    weighted_r2 = calculate_weighted_r2(df)
-
-    with col1:
-        st.metric("Mean Weighted R2", f"{weighted_r2:.4f}" if not np.isnan(weighted_r2) else "N/A")
-
-    if results and "fold_scores" in results:
-        fold_scores = results["fold_scores"]
-        with col2:
-            st.metric("Std", f"{results.get('std_score', np.std(fold_scores)):.4f}")
-        with col3:
-            best_fold = np.argmax(fold_scores)
-            st.metric("Best Fold", f"Fold {best_fold}")
-        with col4:
-            worst_fold = np.argmin(fold_scores)
-            st.metric("Worst Fold", f"Fold {worst_fold}")
-
-    st.divider()
-
     # Two columns: Target Scores and Distribution
     col_left, col_right = st.columns(2)
 
@@ -242,7 +221,6 @@ def render_overview_tab(df: pd.DataFrame, results: dict | None):
                 target_data.append(
                     {
                         "Target": TARGET_DISPLAY[target],
-                        "Weight": TARGET_WEIGHTS[target],
                         "R2": f"{metrics['r2']:.4f}" if not np.isnan(metrics["r2"]) else "N/A",
                         "MAE": f"{metrics['mae']:.4f}" if not np.isnan(metrics["mae"]) else "N/A",
                         "RMSE": f"{metrics['rmse']:.4f}" if not np.isnan(metrics["rmse"]) else "N/A",
@@ -275,47 +253,30 @@ def render_overview_tab(df: pd.DataFrame, results: dict | None):
 
     st.divider()
 
-    # Fold Scores and Physical Constraints
-    col_left2, col_right2 = st.columns(2)
-
-    with col_left2:
-        st.subheader("Fold Scores")
-        if results and "fold_scores" in results:
-            fold_scores = results["fold_scores"]
-            fig = go.Figure()
-            fig.add_trace(
-                go.Bar(
-                    x=[f"Fold {i}" for i in range(len(fold_scores))],
-                    y=fold_scores,
-                    marker_color=[
-                        "green" if s == max(fold_scores) else "red" if s == min(fold_scores) else "steelblue"
-                        for s in fold_scores
-                    ],
-                )
+    # Fold Scores
+    st.subheader("Fold Scores")
+    if results and "fold_scores" in results:
+        fold_scores = results["fold_scores"]
+        fig = go.Figure()
+        fig.add_trace(
+            go.Bar(
+                x=[f"Fold {i}" for i in range(len(fold_scores))],
+                y=fold_scores,
+                marker_color=[
+                    "green" if s == max(fold_scores) else "red" if s == min(fold_scores) else "steelblue"
+                    for s in fold_scores
+                ],
             )
-            fig.update_layout(
-                xaxis_title="Fold",
-                yaxis_title="Score",
-                height=300,
-                margin=dict(l=20, r=20, t=30, b=20),
-            )
-            st.plotly_chart(fig, use_container_width=True)
-        else:
-            st.info("Fold scores not available")
-
-    with col_right2:
-        st.subheader("Physical Constraint Check")
-        constraints = check_physical_constraints(df)
-
-        if "gdm" in constraints:
-            gdm = constraints["gdm"]
-            st.write("**GDM = Clover + Green**")
-            st.write(f"  OK: {gdm['ok_count']} ({gdm['ok_ratio']:.1%}) | NG: {gdm['ng_count']}")
-
-        if "total" in constraints:
-            total = constraints["total"]
-            st.write("**Total = Clover + Dead + Green**")
-            st.write(f"  OK: {total['ok_count']} ({total['ok_ratio']:.1%}) | NG: {total['ng_count']}")
+        )
+        fig.update_layout(
+            xaxis_title="Fold",
+            yaxis_title="Score",
+            height=300,
+            margin=dict(l=20, r=20, t=30, b=20),
+        )
+        st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.info("Fold scores not available")
 
 
 def render_detail_tab(df: pd.DataFrame, results: dict | None):
@@ -325,7 +286,7 @@ def render_detail_tab(df: pd.DataFrame, results: dict | None):
     # Section selector
     section = st.radio(
         "Section",
-        ["Scatter", "Residual", "Fold", "Segment", "Correlation"],
+        ["Scatter", "Residual", "Segment"],
         horizontal=True,
     )
 
@@ -333,12 +294,8 @@ def render_detail_tab(df: pd.DataFrame, results: dict | None):
         render_scatter_section(df)
     elif section == "Residual":
         render_residual_section(df)
-    elif section == "Fold":
-        render_fold_section(df, results)
     elif section == "Segment":
         render_segment_section(df)
-    elif section == "Correlation":
-        render_correlation_section(df)
 
 
 def render_scatter_section(df: pd.DataFrame):
@@ -424,22 +381,29 @@ def render_residual_section(df: pd.DataFrame):
         st.plotly_chart(fig, use_container_width=True)
 
     with col2:
-        # Q-Q Plot
-        theoretical_quantiles = stats.norm.ppf(np.linspace(0.01, 0.99, len(residuals)))
+        # Q-Q Plot (using Filliben's estimate for plotting positions)
+        n = len(residuals)
+        positions = (np.arange(1, n + 1) - 0.375) / (n + 0.25)
+        theoretical_quantiles = stats.norm.ppf(positions)
         sample_quantiles = np.sort(residuals.values)
+
+        # Standardize residuals for proper Q-Q plot
+        sample_mean = np.mean(sample_quantiles)
+        sample_std = np.std(sample_quantiles)
+        standardized_sample = (sample_quantiles - sample_mean) / sample_std if sample_std > 0 else sample_quantiles
 
         fig = go.Figure()
         fig.add_trace(
             go.Scatter(
                 x=theoretical_quantiles,
-                y=sample_quantiles,
+                y=standardized_sample,
                 mode="markers",
                 marker=dict(size=4, opacity=0.5),
             )
         )
-        # Add reference line
-        min_q = min(theoretical_quantiles.min(), sample_quantiles.min())
-        max_q = max(theoretical_quantiles.max(), sample_quantiles.max())
+        # Add reference line (y=x for standardized data)
+        min_q = min(theoretical_quantiles.min(), standardized_sample.min())
+        max_q = max(theoretical_quantiles.max(), standardized_sample.max())
         fig.add_trace(
             go.Scatter(
                 x=[min_q, max_q],
@@ -451,7 +415,7 @@ def render_residual_section(df: pd.DataFrame):
         fig.update_layout(
             title="Q-Q Plot",
             xaxis_title="Theoretical Quantiles",
-            yaxis_title="Sample Quantiles",
+            yaxis_title="Sample Quantiles (standardized)",
             height=300,
             showlegend=False,
             margin=dict(l=20, r=20, t=40, b=20),
@@ -568,6 +532,7 @@ def render_segment_section(df: pd.DataFrame):
                     "N": metrics["n"],
                     "R2": metrics["r2"],
                     "MAE": metrics["mae"],
+                    "RMSE": metrics["rmse"],
                 }
             )
 
@@ -641,12 +606,23 @@ def load_thumbnail(image_path: str, size: int = 150) -> Image.Image | None:
         return None
 
 
+@st.dialog("Image Viewer", width="large")
+def show_image_dialog(image_path: str, sample_id: str):
+    """Show full-size image in a dialog."""
+    st.subheader(sample_id)
+    try:
+        img = Image.open(image_path)
+        st.image(img, use_container_width=True)
+    except Exception:
+        st.error("Failed to load image")
+
+
 def render_gallery_tab(df: pd.DataFrame):
     """Render Gallery tab content."""
     st.header("Sample Gallery")
 
     # Sort and filter options
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3, col4 = st.columns(4)
 
     with col1:
         sort_options = ["Total Error DESC", "Total Error ASC", "Sample ID"]
@@ -666,6 +642,13 @@ def render_gallery_tab(df: pd.DataFrame):
         else:
             selected_state = "All"
 
+    with col4:
+        if "species" in df.columns and not df["species"].isna().all():
+            species_options = ["All"] + sorted(df["species"].dropna().unique().tolist())
+            selected_species = st.selectbox("Filter Species", species_options, key="gallery_species")
+        else:
+            selected_species = "All"
+
     # Apply filters
     filtered_df = df.copy()
 
@@ -675,6 +658,9 @@ def render_gallery_tab(df: pd.DataFrame):
 
     if selected_state != "All":
         filtered_df = filtered_df[filtered_df["state"] == selected_state]
+
+    if selected_species != "All":
+        filtered_df = filtered_df[filtered_df["species"] == selected_species]
 
     # Calculate weighted error for sorting
     weighted_errors = []
@@ -751,6 +737,8 @@ def render_gallery_tab(df: pd.DataFrame):
                     img = load_thumbnail(image_path)
                     if img:
                         st.image(img, use_container_width=True)
+                        if st.button("🔍", key=f"zoom_{sample_id}", help="Enlarge image"):
+                            show_image_dialog(image_path, sample_id)
                     else:
                         st.write("Image load error")
                 else:
@@ -759,12 +747,29 @@ def render_gallery_tab(df: pd.DataFrame):
                 # Sample info
                 fold_str = f"F{int(row['fold'])}" if "fold" in row and pd.notna(row["fold"]) else "?"
                 state_str = row.get("state", "?") if pd.notna(row.get("state")) else "?"
+                species_str = row.get("species", "") if pd.notna(row.get("species")) else ""
+                date_str = row.get("sampling_date", "") if pd.notna(row.get("sampling_date")) else ""
+                height_val = row.get("height_ave_cm", np.nan)
+                ndvi_val = row.get("pre_gshh_ndvi", np.nan)
+                height_str = f"H:{height_val:.1f}cm" if pd.notna(height_val) else ""
+                ndvi_str = f"NDVI:{ndvi_val:.2f}" if pd.notna(ndvi_val) else ""
+
                 st.write(f"**{sample_id}**")
-                st.write(f"{fold_str} | {state_str}")
+                if species_str:
+                    st.write(f"_{species_str}_")
+                info_parts = [fold_str, state_str]
+                if date_str:
+                    info_parts.append(date_str)
+                if height_str:
+                    info_parts.append(height_str)
+                if ndvi_str:
+                    info_parts.append(ndvi_str)
+                st.write(" | ".join(info_parts))
 
                 # GT/Pred/Error table
                 st.markdown("---")
                 error_data = []
+                error_values = []  # Store raw error values for styling
                 for target in TARGET_NAMES:
                     gt = row.get(target, np.nan)
                     pred = row.get(f"pred_{target}", np.nan)
@@ -785,15 +790,37 @@ def render_gallery_tab(df: pd.DataFrame):
                             "Err": err_str,
                         }
                     )
+                    error_values.append(err)
 
-                # Display as compact table
+                # Display as compact table with colored Err column
                 error_df = pd.DataFrame(error_data)
-                st.dataframe(error_df, hide_index=True, use_container_width=True, height=220)
+                error_df["_err_val"] = error_values  # Hidden column for styling
 
-                # Weighted error
-                w_err = row.get("weighted_error", np.nan)
-                if pd.notna(w_err):
-                    st.write(f"**Weighted: {w_err:.2f}**")
+                def color_err_column(row):
+                    """Apply color to Err column based on error value."""
+                    styles = [""] * len(row)
+                    err_idx = list(row.index).index("Err") if "Err" in row.index else -1
+                    if err_idx >= 0:
+                        err_val = row["_err_val"]
+                        if pd.isna(err_val) or row["Err"] == "-":
+                            styles[err_idx] = "color: gray"
+                        elif err_val > 0:
+                            styles[err_idx] = "color: #ff6b6b"  # Red for over-prediction
+                        elif err_val < 0:
+                            styles[err_idx] = "color: #4dabf7"  # Blue for under-prediction
+                        else:
+                            styles[err_idx] = "color: gray"
+                    return styles
+
+                styled_df = error_df.style.apply(color_err_column, axis=1)
+                # Hide the helper column and display
+                st.dataframe(
+                    styled_df,
+                    hide_index=True,
+                    use_container_width=True,
+                    height=220,
+                    column_config={"_err_val": None},  # Hide helper column
+                )
 
 
 def main():
