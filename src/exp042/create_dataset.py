@@ -103,9 +103,7 @@ def main():
         shuffle=True,
         random_state=config.experiment.seed,
     )
-    for fold, (_, val_idx) in enumerate(
-        sgkf.split(df, y=df["state_main_species"], groups=groups)
-    ):
+    for fold, (_, val_idx) in enumerate(sgkf.split(df, y=df["state_main_species"], groups=groups)):
         df.loc[val_idx, "fold"] = fold
 
     # 一時列を削除
