@@ -45,3 +45,4 @@ on_validation_epoch_end()
 
 - exp025の`lightning_module.py`（lines 36-37, 96-101, 117-135, 162-168）を参考にする
 
+
