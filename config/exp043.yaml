@@ -1,0 +1,83 @@
+experiment:
+  name: exp043
+  seed: 1129  # exp040から（State層化最適化）
+
+dataset:
+  input_dir: ./input
+  output_dir: ./output
+  n_folds: 3  # exp040から（3-fold CV）
+  shuffle: true
+
+model:
+  name: "facebook/dinov3-vitl16-pretrain-lvd1689m"
+  pretrained: true
+  in_channels: 3
+  use_lora: true
+  lora_r: 8
+  lora_alpha: 16
+  lora_dropout: 0.1
+  # DINOv3用: 正規表現で最後の6レイヤーのattentionを指定
+  lora_target_modules: "layer\\.(1[89]|2[0-3])\\.attention\\.(q|k|v|o)_proj"
+
+loss:
+  name: "smooth_l1_loss"
+  params: {}
+
+aux_loss:
+  name: "aux_loss"
+  params: {}
+  weight: 0.1
+
+trainer:
+  train:
+    epochs: 100
+    warmup_epochs: 3
+    batch_size: 16
+    num_workers: 4
+    pin_memory: true
+    drop_last: true
+    prefetch_factor: 2
+    patience: null
+    device_type: "auto"
+    devices: 1
+    precision: "16-mixed"
+    accumulate_grad_batches: 1
+    val_check_interval: 1.0
+    strategy: "auto"
+    deterministic: true
+    lora_lr: 1e-4
+    head_lr: 1e-3
+    optimizer:
+      weight_decay: 1e-2
+    ema:
+      decay: 0.995
+      update_after_step: 0
+    use_wandb: true
+  valid:
+    batch_size: 32
+    num_workers: 4
+    pin_memory: false
+    drop_last: false
+    prefetch_factor: 2
+
+augmentation:
+  train:
+    image_size: 512
+    horizontal_flip: 0.5
+    vertical_flip: 0.5
+    rotation_limit: 20
+    shift_limit: 0.1
+    scale_limit: 0.2
+    elastic_transform: true
+    brightness_contrast: true
+    gamma_transform: true
+    gaussian_noise: true
+    blur: true
+    mixup:
+      enabled: true
+      alpha: 0.2
+      prob: 0.5
+  valid:
+    image_size: 512
+    horizontal_flip: 0.0
+    vertical_flip: 0.0
