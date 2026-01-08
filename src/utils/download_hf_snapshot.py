@@ -52,7 +52,7 @@ def main(
     snapshot_download(**download_kwargs)
 
     print(f"Snapshot saved to {snapshot_dir}")
-    print(f"Files in snapshot:")
+    print("Files in snapshot:")
     for file in sorted(snapshot_dir.rglob("*")):
         if file.is_file():
             print(f"  {file.relative_to(snapshot_dir)}")
@@ -60,4 +60,3 @@ def main(
 
 if __name__ == "__main__":
     tyro.cli(main)
-
