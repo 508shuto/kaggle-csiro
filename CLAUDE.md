@@ -36,7 +36,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### 更新ルール
 
-1. **作業開始時**: フォルダ作成、3ファイル新規作成、tasklist.md に完了条件を記載
+1. **作業開始時**: フォルダ作成、3ファイル新規作成、tasklist.md に完了条件を記載、`doc/experiment/expXXX.md` も同時に作成
 2. **作業中**: 仕様変更は requirements.md 更新、design.md に影響差分、tasklist.md で進捗管理
 3. **作業完了時**: 完了条件確認、フォルダはそのまま残す（履歴）、汎用知見は doc/* に反映
 
@@ -75,6 +75,35 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ---
 
+## 実験ワークフロー（必須）
+
+新しい実験を開始する際は、以下のワークフローに従う。
+
+### フェーズ1: ドキュメント作成
+
+以下のドキュメントを作成する：
+
+- [ ] `.steering/YYYYMMDD-expXXX-xxx/requirements.md`
+- [ ] `.steering/YYYYMMDD-expXXX-xxx/design.md`
+- [ ] `.steering/YYYYMMDD-expXXX-xxx/tasklist.md`
+- [ ] `doc/experiment/expXXX.md`（目的・設定を記載）
+
+### フェーズ2: ドキュメントレビュー
+
+`/review-exp` を実行してドキュメントをレビューし、指摘事項を修正する。
+
+### フェーズ3: 実装
+
+ドキュメントが完成したら、実装コードを書き始める。
+
+**重要:** フェーズ1-2が完了していない場合、実装を開始してはならない。
+
+### フェーズ4: ステージング
+
+実装完了後、`/stage-exp` を実行してファイルを git add する。
+
+---
+
 ## Doc Index（永続ドキュメント導線）
 
 | ファイル | 内容 |
@@ -96,7 +125,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **命名規則:** `doc/experiment/expXXX.md`
 
-**作成タイミング:** CV完了後（CVスコアが確定した時点）
+**作成タイミング:** 実験計画確定時（実装前）に骨子を作成し、CV完了後に結果を追記する。
 
 **テンプレート雛形:**
 ```markdown
