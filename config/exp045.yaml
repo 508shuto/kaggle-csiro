@@ -1,0 +1,87 @@
+experiment:
+  name: exp045
+  seed: 1129  # CV最適化: 3-fold State層化
+
+dataset:
+  input_dir: ./input
+  output_dir: ./output
+  n_folds: 3
+  shuffle: true
+
+model:
+  name: "vit_large_patch16_dinov3.lvd1689m"
+  pretrained: true
+  in_channels: 3
+  freeze_backbone: false  # Partial Unfreeze
+  unfreeze_blocks: [22, 23]  # 最後の2ブロックのみ学習
+
+loss:
+  name: "smooth_l1_loss"
+  params: {}
+
+aux_loss:
+  name: "aux_loss"
+  params: {}
+  weight: 0.1
+
+trainer:
+  train:
+    epochs: 100
+    warmup_epochs: 5  # 増加: backbone学習のため
+    batch_size: 16
+    num_workers: 4
+    pin_memory: true
+    drop_last: true
+    prefetch_factor: 2
+    patience: null
+    device_type: "auto"
+    devices: 1
+    precision: "16-mixed"
+    accumulate_grad_batches: 1
+    val_check_interval: 1.0
+    strategy: "auto"
+    deterministic: true
+    # Partial Unfreeze用: 別々の学習率
+    backbone_lr: 1e-5  # 低学習率
+    head_lr: 1e-3      # 通常学習率
+    optimizer:
+      opt: "adamw"
+      lr: 1e-3  # デフォルト（head用）
+      weight_decay: 1e-2
+      betas: [0.9, 0.999]
+      eps: 1e-8
+      amsgrad: false
+    scheduler:
+      sched: "cosine"
+    ema:
+      decay: 0.995
+      update_after_step: 0
+    use_wandb: true
+  valid:
+    batch_size: 32
+    num_workers: 4
+    pin_memory: false
+    drop_last: false
+    prefetch_factor: 2
+
+augmentation:
+  train:
+    image_size: 512
+    horizontal_flip: 0.5
+    vertical_flip: 0.5
+    rotation_limit: 20
+    shift_limit: 0.1
+    scale_limit: 0.2
+    elastic_transform: true
+    brightness_contrast: true
+    gamma_transform: true
+    gaussian_noise: true
+    blur: true
+    mixup:
+      enabled: true
+      alpha: 0.2
+      prob: 0.5
+  valid:
+    image_size: 512
+    horizontal_flip: 0.0
+    vertical_flip: 0.0
