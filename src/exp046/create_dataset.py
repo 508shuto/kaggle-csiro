@@ -98,7 +98,7 @@ def compute_sampling_weights(
     q1_mask = df["total_target"] <= q1_threshold
     weights[q1_mask] *= q1_weight  # WA & Q1は wa_weight * q1_weight 倍
 
-    print(f"Sampling weights computed:")
+    print("Sampling weights computed:")
     print(f"  WA weight: {wa_weight}, Q1 weight: {q1_weight}")
     print(f"  Q1 threshold (25%ile): {q1_threshold:.2f}")
     print(f"  WA samples: {wa_mask.sum()}")
