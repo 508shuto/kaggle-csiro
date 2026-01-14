@@ -1,4 +1,5 @@
 """事前にQuantile重みを計算してJSONに保存"""
+
 import json
 
 import numpy as np
