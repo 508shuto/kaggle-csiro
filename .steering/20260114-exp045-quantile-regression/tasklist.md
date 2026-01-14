@@ -11,15 +11,15 @@
 
 ### フェーズ1: ドキュメント
 - [x] Done: ステアリングドキュメント作成（requirements.md, design.md, tasklist.md）
-- [ ] TODO: 実験ドキュメント作成（doc/experiment/exp045.md）
+- [x] Done: 実験ドキュメント作成（doc/experiment/exp045.md）
 - [ ] TODO: /review-exp でレビュー
 
 ### フェーズ2: 実装
-- [ ] TODO: src/exp045/ ディレクトリ作成
-- [ ] TODO: exp044 からファイルコピー
-- [ ] TODO: loss.py に PinballLoss 実装
-- [ ] TODO: lightning_module.py で損失関数差し替え
-- [ ] TODO: config/exp045.yaml 作成
+- [x] Done: src/exp045/ ディレクトリ作成
+- [x] Done: exp044 からファイルコピー
+- [x] Done: loss.py に PinballLoss 実装
+- [x] Done: lightning_module.py で損失関数差し替え
+- [x] Done: config/exp045.yaml 作成
 
 ### フェーズ3: 検証
 - [ ] TODO: 3-fold CV 実行
