@@ -13,7 +13,6 @@ from lightning_module import CSIROModule
 from omegaconf import DictConfig, OmegaConf
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
 from pytorch_lightning.loggers import WandbLogger
-from pytorch_lightning.strategies import DDPStrategy
 from torch.utils.data import DataLoader
 
 from utils import seed_everything
@@ -77,17 +76,12 @@ def train_fold(config: DictConfig, df: pd.DataFrame, fold: int) -> None:
         config=config,
     )
 
-    # Strategy の処理: ddp_find_unused_parameters_true の場合は明示的に DDPStrategy を設定
-    strategy = config.trainer.train.strategy
-    if strategy == "ddp_find_unused_parameters_true":
-        strategy = DDPStrategy(find_unused_parameters=True)
-
     trainer = L.Trainer(
         max_epochs=config.trainer.train.epochs,
         accelerator=config.trainer.train.device_type,
         devices=config.trainer.train.devices,
         precision=config.trainer.train.precision,
-        strategy=strategy,
+        strategy=config.trainer.train.strategy,
         accumulate_grad_batches=config.trainer.train.accumulate_grad_batches,
         val_check_interval=config.trainer.train.val_check_interval,
         deterministic=config.trainer.train.deterministic,
@@ -96,43 +90,33 @@ def train_fold(config: DictConfig, df: pd.DataFrame, fold: int) -> None:
     )
     trainer.fit(module, train_dataloaders=train_loader, val_dataloaders=valid_loader)
 
-    # Synchronize all ranks before post-processing
-    if hasattr(trainer.strategy, "barrier"):
-        trainer.strategy.barrier()
-
     # Rename last.ckpt to fold{fold}_epoch={epoch}-val_score={val_score:.4f}.ckpt
-    # Only rank0 should perform this operation to avoid race conditions in DDP
-    if trainer.is_global_zero:
-        last_ckpt = Path(config.dataset.output_dir) / "last.ckpt"
-        if last_ckpt.exists():
-            # epochはcheckpointファイルから取得（trainer.current_epochの+1ズレを避ける）
-            ckpt = torch.load(last_ckpt, map_location="cpu", weights_only=False)
-            epoch = ckpt.get("epoch", trainer.current_epoch)
-            if epoch is None:
-                epoch = trainer.current_epoch
+    last_ckpt = Path(config.dataset.output_dir) / "last.ckpt"
+    if last_ckpt.exists():
+        # epochはcheckpointファイルから取得（trainer.current_epochの+1ズレを避ける）
+        ckpt = torch.load(last_ckpt, map_location="cpu", weights_only=False)
+        epoch = ckpt.get("epoch", trainer.current_epoch)
+        if epoch is None:
+            epoch = trainer.current_epoch
 
-            # val_scoreはtrainerのcallback_metricsから取得
-            if "val_score" not in trainer.callback_metrics:
-                raise ValueError(
-                    f"val_score not found in trainer.callback_metrics. "
-                    f"Available keys: {list(trainer.callback_metrics.keys())}"
-                )
-            val_score_tensor = trainer.callback_metrics["val_score"]
-            if isinstance(val_score_tensor, torch.Tensor):
-                val_score = val_score_tensor.item()
-            else:
-                val_score = float(val_score_tensor)
+        # val_scoreはtrainerのcallback_metricsから取得
+        if "val_score" not in trainer.callback_metrics:
+            raise ValueError(
+                f"val_score not found in trainer.callback_metrics. "
+                f"Available keys: {list(trainer.callback_metrics.keys())}"
+            )
+        val_score_tensor = trainer.callback_metrics["val_score"]
+        if isinstance(val_score_tensor, torch.Tensor):
+            val_score = val_score_tensor.item()
+        else:
+            val_score = float(val_score_tensor)
 
-            new_name = Path(config.dataset.output_dir) / f"fold{fold}_epoch={epoch}-val_score={val_score:.4f}.ckpt"
-            last_ckpt.rename(new_name)
-            print(f"Saved checkpoint: {new_name}")
+        new_name = Path(config.dataset.output_dir) / f"fold{fold}_epoch={epoch}-val_score={val_score:.4f}.ckpt"
+        last_ckpt.rename(new_name)
+        print(f"Saved checkpoint: {new_name}")
 
-        if config.trainer.train.use_wandb:
-            wandb.finish()
-
-    # Synchronize all ranks after post-processing
-    if hasattr(trainer.strategy, "barrier"):
-        trainer.strategy.barrier()
+    if config.trainer.train.use_wandb:
+        wandb.finish()
 
 
 def main(
