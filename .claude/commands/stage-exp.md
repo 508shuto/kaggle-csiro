@@ -1,3 +1,8 @@
+---
+description: 実験ファイルをgit addでステージング
+allowed-tools: Bash(git:*), Read, Glob
+---
+
 # Stage Experiment Files
 
 指定された実験番号のファイルをgit addでステージングします。

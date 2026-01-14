@@ -1,3 +1,8 @@
+---
+description: ステアリング・実験ドキュメントをレビュー
+allowed-tools: Read, Glob, Grep, Write
+---
+
 # Review Experiment Steering & Documentation
 
 実験番号を指定して、ステアリングファイルと実験ドキュメントを一括レビューします。
