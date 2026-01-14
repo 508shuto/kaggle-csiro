@@ -1,11 +1,12 @@
 # Tasklist
 
 ## 完了条件（Definition of Done）
-- [ ] AutoModelベースでQwen3-VL-2Bが動作
+- [x] AutoModelベースでQwen3-VL-2Bが動作
 - [ ] 3-fold CVでスコア算出完了
 
 ## タスク
-- [ ] TODO: models.pyをAutoModelベースに修正
-- [ ] TODO: config/exp046.yaml作成
-- [ ] TODO: doc/experiment/exp046.md作成
-- [ ] TODO: 動作確認
+- [x] Done: models.pyをAutoModelベースに修正
+- [x] Done: config/exp046.yaml作成
+- [x] Done: doc/experiment/exp046.md作成
+- [x] Done: 動作確認
+- [x] Done: コードレビュー対応（パラメータ修正、Loss最適化）

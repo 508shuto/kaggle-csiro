@@ -11,7 +11,7 @@ dataset:
 model:
   name: "Qwen/Qwen3-VL-2B-Instruct"
   pretrained: true
-  in_channels: 3
+  out_channels: 3  # [clover, dead, green]
   hidden_size: 1536  # Qwen3-VL-2B visual hidden size
   freeze_encoder: true
 

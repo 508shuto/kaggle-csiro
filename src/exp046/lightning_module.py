@@ -28,7 +28,7 @@ class CSIROModule(L.LightningModule):
         self.model = CSIROModel(
             model_name=config.model.name,
             pretrained=config.model.pretrained,
-            in_channels=config.model.in_channels,
+            out_channels=config.model.get("out_channels", 3),
             hidden_size=config.model.get("hidden_size", 1536),
             freeze_encoder=config.model.get("freeze_encoder", True),
         )
@@ -84,6 +84,11 @@ class CSIROModule(L.LightningModule):
         )
         return loss
 
+    def on_validation_epoch_start(self):
+        """Clear validation predictions at the start of each epoch to prevent memory leaks."""
+        self.val_preds = []
+        self.val_targets = []
+
     def validation_step(self, batch, batch_idx):
         pixel_values = batch["pixel_values"]
         image_grid_thw = batch["image_grid_thw"]
@@ -105,9 +110,6 @@ class CSIROModule(L.LightningModule):
         self.aux_metrics.update(aux_preds, aux_targets)
 
         # Store for per-class metrics
-        if not hasattr(self, "val_preds"):
-            self.val_preds = []
-            self.val_targets = []
         self.val_preds.append(preds)
         self.val_targets.append(targets)
 
@@ -126,7 +128,7 @@ class CSIROModule(L.LightningModule):
         aux_metrics = self.aux_metrics.compute()
 
         # Per-class RMSE/MAE
-        if hasattr(self, "val_preds") and len(self.val_preds) > 0:
+        if len(self.val_preds) > 0:
             all_preds = torch.cat(self.val_preds, dim=0)
             all_targets = torch.cat(self.val_targets, dim=0)
 
@@ -137,9 +139,6 @@ class CSIROModule(L.LightningModule):
 
                 class_mae = torch.mean(torch.abs(all_preds[:, i] - all_targets[:, i]))
                 self.log(f"val_mae_{class_name}", class_mae)
-
-            self.val_preds = []
-            self.val_targets = []
 
         # R2 scores
         if "r2_score" in metrics:
