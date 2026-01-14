@@ -24,7 +24,7 @@ pred_5
 | ファイル | 変更内容 |
 |---------|---------|
 | models.py | AutoModelベースに変更 |
-| config/exp046.yaml | exp046用設定 |
+| config/exp048.yaml | exp048用設定 |
 
 ## exp045との差分
 - Qwen3VLForConditionalGeneration → AutoModel

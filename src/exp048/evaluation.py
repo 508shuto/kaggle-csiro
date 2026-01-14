@@ -14,7 +14,7 @@ from tqdm import tqdm
 
 
 def main(
-    model_dir: Path = Path("./output/exp046"),
+    model_dir: Path = Path("./output/exp048"),
     folds: list[int] | None = None,
     device: str = "cuda",
 ):
