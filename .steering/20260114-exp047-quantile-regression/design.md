@@ -39,10 +39,12 @@ class PinballLoss(nn.Module):
 
 ### 既存との差分
 
-| 項目 | exp044 | exp047 |
+| 項目 | exp040 | exp047 |
 |------|--------|--------|
-| 損失関数 | InverseWeightedSmoothL1Loss | PinballLoss (τ=0.5) |
+| 損失関数 | WeightedSmoothL1Loss | PinballLoss (τ=0.5) |
 | 予測対象 | 条件付き期待値 | 条件付き中央値 |
+| モデル読み込み | timm | timm |
+| Backboneフリーズ | Yes | Yes |
 | モデル構造 | 同一 | 同一 |
 | 物理制約 | あり | あり |
 
@@ -73,17 +75,17 @@ class PinballLoss(nn.Module):
 
 ```
 src/exp047/
-├── models.py            # exp044からコピー（変更なし）
-├── loss.py              # PinballLoss実装
-├── metrics.py           # exp044からコピー（変更なし）
-├── lightning_module.py  # 損失関数の差し替え
-├── train.py             # exp044からコピー（変更なし）
-├── evaluation.py        # exp044からコピー（変更なし）
-├── inference.py         # exp044からコピー（変更なし）
-├── dataset.py           # exp044からコピー（変更なし）
-├── utils.py             # exp044からコピー（変更なし）
-└── create_dataset.py    # exp044からコピー（変更なし）
+├── models.py            # exp040からコピー（timm + freeze backbone）
+├── loss.py              # exp040ベース + PinballLoss実装
+├── metrics.py           # exp040からコピー（変更なし）
+├── lightning_module.py  # exp040からコピー（timm optim/scheduler）
+├── train.py             # exp040からコピー（変更なし）
+├── evaluation.py        # exp040からコピー（変更なし）
+├── inference.py         # exp040からコピー（変更なし）
+├── dataset.py           # exp040からコピー（変更なし）
+├── utils.py             # exp040ベース + pinball対応
+└── create_dataset.py    # exp040からコピー（変更なし）
 
 config/
-└── exp047.yaml          # 新規作成
+└── exp047.yaml          # exp040ベース + loss: pinball
 ```

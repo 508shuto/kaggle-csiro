@@ -9,9 +9,7 @@ import torch.nn as nn
 from albumentations.pytorch import ToTensorV2
 from loss import (
     AuxLoss,
-    InverseWeightedSmoothL1Loss,
     PinballLoss,
-    QuantileWeightedSmoothL1Loss,
     WeightedMSELoss,
     WeightedSmoothL1Loss,
 )
@@ -46,15 +44,11 @@ def get_loss_fn(params: DictConfig, loss_name: str) -> nn.Module:
         return WeightedMSELoss()
     elif loss_name == "smooth_l1_loss":
         return WeightedSmoothL1Loss()
-    elif loss_name == "quantile_weighted_smooth_l1":
-        return QuantileWeightedSmoothL1Loss()
-    elif loss_name == "inverse_weighted_smooth_l1":
-        return InverseWeightedSmoothL1Loss()
-    elif loss_name == "pinball":
-        quantile = params.get("quantile", 0.5) if params else 0.5
-        return PinballLoss(quantile=quantile)
     elif loss_name == "aux_loss":
         return AuxLoss()
+    elif loss_name == "pinball":
+        quantile = params.loss.params.get("quantile", 0.5) if hasattr(params, "loss") else 0.5
+        return PinballLoss(quantile=quantile)
     else:
         raise ValueError(f"Loss function {loss_name} not found")
 

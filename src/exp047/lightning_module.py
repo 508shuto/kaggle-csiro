@@ -3,10 +3,10 @@ import torch
 from metrics import CLASS_NAMES, WEIGHTS, WeightedR2Score
 from models import CSIROModel
 from omegaconf import DictConfig
+from timm.optim._optim_factory import create_optimizer_v2
+from timm.scheduler.scheduler_factory import create_scheduler_v2
 from timm.utils.model_ema import ModelEmaV3
-from torch.optim import AdamW
 from torchmetrics import MeanAbsoluteError, MeanSquaredError, MetricCollection, R2Score
-from transformers import get_cosine_schedule_with_warmup
 
 from utils import get_loss_fn, mixup_batch
 
@@ -18,22 +18,12 @@ class CSIROModule(L.LightningModule):
     ):
         super().__init__()
         self.config = config
-        self.use_lora = config.model.get("use_lora", True)
-
-        # LoRA設定を取得
-        lora_target_modules = config.model.get("lora_target_modules", None)
-        lora_layers_to_transform = config.model.get("lora_layers_to_transform", None)
-
+        self.freeze_backbone = config.model.get("freeze_backbone", True)
         self.model = CSIROModel(
             model_name=config.model.name,
             pretrained=config.model.pretrained,
             in_channels=config.model.in_channels,
-            use_lora=self.use_lora,
-            lora_r=config.model.get("lora_r", 8),
-            lora_alpha=config.model.get("lora_alpha", 16),
-            lora_dropout=config.model.get("lora_dropout", 0.1),
-            lora_target_modules=lora_target_modules,
-            lora_layers_to_transform=lora_layers_to_transform,
+            freeze_backbone=self.freeze_backbone,
         )
         self.model_ema = ModelEmaV3(
             self.model,
@@ -183,43 +173,35 @@ class CSIROModule(L.LightningModule):
         self.aux_metrics.reset()
 
     def configure_optimizers(self):
+        # Freeze時は学習可能なパラメータのみをoptimizerに渡す
         trainable_params = self.model.get_trainable_parameters()
-
-        # LoRA使用時はパラメータグループを分離
-        if isinstance(trainable_params, dict):
-            param_groups = [
-                {
-                    "params": trainable_params["lora"],
-                    "lr": self.config.trainer.train.lora_lr,
-                    "weight_decay": self.config.trainer.train.optimizer.weight_decay,
-                },
-                {
-                    "params": trainable_params["head"],
-                    "lr": self.config.trainer.train.head_lr,
-                    "weight_decay": self.config.trainer.train.optimizer.weight_decay,
-                },
-            ]
-            optimizer = AdamW(param_groups)
-        else:
-            optimizer = AdamW(
-                trainable_params,
-                lr=self.config.trainer.train.optimizer.lr,
-                weight_decay=self.config.trainer.train.optimizer.weight_decay,
-            )
-
-        # Scheduler: transformersのcosine schedule with warmup
-        total_steps = self.trainer.estimated_stepping_batches
-        warmup_steps = self.config.trainer.train.warmup_epochs * (total_steps // self.config.trainer.train.epochs)
-
-        scheduler = get_cosine_schedule_with_warmup(
-            optimizer,
-            num_warmup_steps=warmup_steps,
-            num_training_steps=total_steps,
+        optimizer = create_optimizer_v2(
+            model_or_params=trainable_params,
+            **self.config.trainer.train.optimizer,
         )
+        updates_per_epoch = self._get_steps_per_epoch()
 
+        scheduler_config = dict(self.config.trainer.train.scheduler)
+
+        scheduler, _ = create_scheduler_v2(
+            optimizer=optimizer,
+            num_epochs=self.config.trainer.train.epochs,
+            warmup_lr=0,
+            **scheduler_config,
+            step_on_epochs=False,
+            updates_per_epoch=updates_per_epoch,
+        )
         lr_dict = dict(
             scheduler=scheduler,
             interval="step",
-            frequency=1,
+            frequency=1,  # same as default
         )
         return dict(optimizer=optimizer, lr_scheduler=lr_dict)
+
+    def _get_steps_per_epoch(self) -> int:
+        total_steps: int = self.trainer.estimated_stepping_batches
+        steps_per_epoch: int = total_steps // self.config.trainer.train.epochs
+        return steps_per_epoch
+
+    def lr_scheduler_step(self, scheduler, metric):
+        scheduler.step_update(num_updates=self.global_step)

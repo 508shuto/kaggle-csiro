@@ -35,7 +35,8 @@ L_τ(y, ŷ) = max(τ * (y - ŷ), (τ - 1) * (y - ŷ))
 
 ## 制約・前提条件
 
-- ベース: exp044（DINOv3 + LoRA + 3-fold CV）
-- 学習設定: exp044の設定を踏襲（lr, scheduler, batch_size等）
-- CVストラテジー: 3-fold（exp040で最適化済み）
+- ベース: exp040（DINOv3 + Frozen backbone + 3-fold CV）
+- 学習設定: exp040の設定を踏襲（lr, scheduler, batch_size等）
+- CVストラテジー: 3-fold State層化（exp040で最適化済み）
+- Seed: 1129
 - ターゲット重み: [0.1, 0.1, 0.1, 0.2, 0.5]（既存維持）

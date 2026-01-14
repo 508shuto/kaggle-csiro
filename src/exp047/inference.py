@@ -220,9 +220,9 @@ def predict(
 
 def main(
     test_csv_path: Path = Path("./input/test.csv"),
-    config_path: Path = Path("./config/exp044.yaml"),
-    model_dir: Path = Path("./output/exp044"),
-    output_dir: Path = Path("./output/exp044"),
+    config_path: Path = Path("./config/exp003.yaml"),
+    model_dir: Path = Path("./output/exp003"),
+    output_dir: Path = Path("./output/exp003"),
     folds: list[int] | None = None,
     device: str = "auto",
     batch_size: int = 32,
