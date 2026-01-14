@@ -53,7 +53,13 @@ def main(
             collate_fn=collator,
         )
 
-        model_path = list(model_dir.glob(f"fold{fold}*.ckpt"))[0]
+        # Load checkpoint with validation
+        ckpt_paths = list(model_dir.glob(f"fold{fold}*.ckpt"))
+        if not ckpt_paths:
+            raise FileNotFoundError(f"No checkpoint found for fold {fold} in {model_dir}")
+        if len(ckpt_paths) > 1:
+            print(f"Warning: Multiple checkpoints found for fold {fold}, using {ckpt_paths[0]}")
+        model_path = ckpt_paths[0]
         model = (
             CSIROModule.load_from_checkpoint(
                 checkpoint_path=model_path,

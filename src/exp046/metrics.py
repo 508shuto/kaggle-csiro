@@ -3,6 +3,9 @@ import torch
 from sklearn.metrics import r2_score
 from torchmetrics import Metric
 
+# Weight rationale: Prioritize Dry_Total (0.5) as the primary target,
+# GDM (0.2) as secondary, and individual components (0.1 each) equally.
+# These weights match the Kaggle competition evaluation metric.
 WEIGHTS = [
     0.1,  # Dry Clover
     0.1,  # Dry Dead

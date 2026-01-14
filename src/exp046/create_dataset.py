@@ -49,6 +49,13 @@ def create_metadata(df: pd.DataFrame, input_dir: Path) -> pd.DataFrame:
                 target_dict["total_target"] = row["target"]
             else:
                 raise ValueError(f"Target name {row['target_name']} not found")
+
+        # Validate that all required targets are present
+        required_keys = ["clover_target", "dead_target", "green_target", "gdm_target", "total_target"]
+        missing_keys = set(required_keys) - set(target_dict.keys())
+        if missing_keys:
+            raise ValueError(f"Missing targets for {image_path}: {missing_keys}")
+
         # JPEGファイルのフルパスを生成（input/train/xxx.jpg）
         data_path = input_dir / image_path
         data_items.append(

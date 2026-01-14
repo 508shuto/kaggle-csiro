@@ -14,7 +14,6 @@ class CSIROModel(nn.Module):
         self,
         model_name: str = "Qwen/Qwen3-VL-2B-Instruct",
         pretrained: bool = True,
-        in_channels: int = 3,
         out_channels: int = 3,  # [clover, dead, green]
         aux_out_channels: int = 2,
         hidden_size: int = 1536,  # Qwen3-VL-2B visual hidden size
@@ -25,6 +24,8 @@ class CSIROModel(nn.Module):
         self.hidden_size = hidden_size
 
         # Load model using AutoModel
+        # Precision strategy: Encoder operates in bfloat16 for memory efficiency,
+        # features are cast to float32 for regression head to ensure numerical stability
         if pretrained:
             self.encoder = AutoModel.from_pretrained(
                 model_name,
@@ -92,7 +93,8 @@ class CSIROModel(nn.Module):
 
             features = torch.stack(features_list, dim=0)  # (B, hidden_size)
 
-        # Cast to float32 for head
+        # Cast to float32 for regression head (encoder outputs bfloat16)
+        # This ensures numerical stability in gradient computation for the head
         features = features.float()
 
         # Predict 3 base targets
