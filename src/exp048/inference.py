@@ -5,7 +5,6 @@ import pandas as pd
 import torch
 import torch.nn as nn
 import tyro
-from dataset import Qwen3VLCollator
 from lightning_module import CSIROModule
 from omegaconf import DictConfig, OmegaConf
 from PIL import Image

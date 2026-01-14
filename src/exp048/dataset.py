@@ -65,7 +65,7 @@ class Qwen3VLCollator:
         self.processor = AutoProcessor.from_pretrained(model_name)
 
     def __call__(self, batch: list) -> dict:
-        images, targets, aux_targets = zip(*batch)
+        images, targets, aux_targets = zip(*batch, strict=True)
 
         # Stack targets
         targets = torch.stack(targets, dim=0)

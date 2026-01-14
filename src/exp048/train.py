@@ -162,9 +162,9 @@ def main(
 
     # Train folds
     for fold in folds:
-        print(f"\n{'='*50}")
+        print(f"\n{'=' * 50}")
         print(f"Training fold {fold}")
-        print(f"{'='*50}")
+        print(f"{'=' * 50}")
         train_fold(config, df, fold, collator)
         if debug:
             break

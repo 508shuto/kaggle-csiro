@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from transformers import AutoModel, AutoProcessor
+from transformers import AutoModel
 
 
 class CSIROModel(nn.Module):
@@ -34,6 +34,7 @@ class CSIROModel(nn.Module):
             )
         else:
             from transformers import AutoConfig
+
             config = AutoConfig.from_pretrained(model_name, trust_remote_code=True)
             self.encoder = AutoModel.from_config(config, trust_remote_code=True)
 
@@ -80,7 +81,6 @@ class CSIROModel(nn.Module):
             # visual_outputs: (total_patches, hidden_size)
 
             # Pool per image
-            batch_size = image_grid_thw.shape[0]
             patches_per_image = (image_grid_thw[:, 1] * image_grid_thw[:, 2]).tolist()
 
             features_list = []
