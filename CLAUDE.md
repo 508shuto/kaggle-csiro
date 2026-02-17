@@ -2,6 +2,276 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Project Overview
+
+Kaggle CSIRO Image2Biomass Prediction competition. The task is to predict 5 pasture biomass components (grams) from grassland images using regression models.
+
+**Targets:** Dry_Green_g, Dry_Dead_g, Dry_Clover_g, GDM_g, Dry_Total_g
+
+**Physical constraints:**
+```
+GDM_g = Dry_Clover_g + Dry_Green_g
+Dry_Total_g = Dry_Clover_g + Dry_Dead_g + Dry_Green_g
+```
+
+**Evaluation:** Weighted R² with per-target weights [Clover=0.1, Dead=0.1, Green=0.1, GDM=0.2, Total=0.5]
+
+**Submission:** Long-format CSV with `sample_id` (`{image_id}__{target_name}`) and `target` columns.
+
+Full details: `doc/01_competition.md`
+
+---
+
+## Codebase Structure
+
+```
+project/
+├── config/                     # YAML configs (one per experiment)
+│   └── expXXX.yaml
+├── src/
+│   ├── expXXX/                 # Self-contained experiment implementations
+│   │   ├── create_dataset.py   # Data preprocessing, fold assignment
+│   │   ├── dataset.py          # PyTorch Dataset class
+│   │   ├── train.py            # Training script (K-fold CV)
+│   │   ├── evaluation.py       # OOF evaluation, CV score
+│   │   ├── inference.py        # Test prediction, submission generation
+│   │   ├── lightning_module.py  # PyTorch Lightning module
+│   │   ├── models.py           # Model architecture
+│   │   ├── loss.py             # Loss functions
+│   │   ├── metrics.py          # WeightedR2Score, RMSE, MAE
+│   │   ├── utils.py            # Utilities
+│   │   └── img2npy.py          # Image→numpy conversion (some experiments)
+│   └── utils/                  # Shared utilities
+│       ├── download_hf_snapshot.py
+│       └── upload_scripts.py
+├── input/                      # Competition data (not committed)
+│   ├── train.csv, test.csv
+│   ├── train/, test/           # Image directories
+│   └── download_data.sh
+├── output/                     # Experiment artifacts (not committed)
+│   └── expXXX/
+│       ├── preprocessed_train.csv
+│       ├── fold{i}.ckpt        # Model checkpoints
+│       ├── oofs.csv            # Out-of-fold predictions
+│       ├── results.json        # CV scores
+│       └── submission.csv
+├── doc/                        # Permanent documentation
+│   ├── 01_competition.md       # Task, targets, metric, submission format
+│   ├── 02_architecture.md      # Directory structure, pipeline, artifacts
+│   ├── 03_workflow.md          # Experiment procedures, W&B, checklists
+│   ├── glossary.md             # Term definitions
+│   └── experiment/             # Per-experiment docs (exp025–exp047)
+│       └── expXXX.md
+├── .steering/                  # Short-term work tracking (committed as history)
+│   └── YYYYMMDD-expXXX-title/
+│       ├── requirements.md
+│       ├── design.md
+│       └── tasklist.md
+├── .claude/                    # Claude Code customization
+│   ├── agents/                 # Custom agent definitions
+│   └── commands/               # Slash commands (/review-exp, /stage-exp)
+├── app/                        # Streamlit applications
+│   ├── streamlit_app.py        # Main app
+│   └── oof_analysis_app.py     # OOF prediction analysis
+├── notebook/                   # Jupyter notebooks
+│   ├── eda/                    # Exploratory data analysis
+│   └── exp000–exp003/          # Experiment notebooks
+├── pipeline.sh                 # Master pipeline (dataset→train→eval→infer→upload)
+├── 01_create_dateset.sh        # Dataset creation stage
+├── 02_train.slurm              # SLURM training job
+├── 03_evaluation.slurm         # SLURM evaluation job
+├── 04_submit_scripts.sh        # Kaggle submission upload
+├── Dockerfile, docker-compose.yaml
+├── pyproject.toml              # Dependencies (uv)
+└── .pre-commit-config.yaml     # Ruff + detect-secrets
+```
+
+**Experiments:** 48 total (exp000–exp047). Each is self-contained in `src/expXXX/` with a matching `config/expXXX.yaml`.
+
+---
+
+## Technology Stack
+
+| Category | Tool/Library |
+|----------|-------------|
+| Language | Python 3.12+ |
+| Package manager | uv |
+| Deep learning | PyTorch, PyTorch Lightning |
+| Vision models | timm (DINOv2, DINOv3, SigLIP), transformers |
+| Fine-tuning | peft (LoRA) |
+| Data | pandas, polars, numpy |
+| Image augmentation | albumentations, OpenCV |
+| Experiment tracking | W&B (project: kaggle-csiro) |
+| Config | OmegaConf (YAML) |
+| Linting/Format | Ruff |
+| Pre-commit | Ruff formatter + linter, detect-secrets |
+| CI | GitHub Actions (Ruff, Claude Code review) |
+
+---
+
+## Development Commands
+
+```bash
+# Dependencies
+uv sync
+
+# Code quality (Ruff)
+uv run ruff format .
+uv run ruff check .
+uv run ruff check --fix .
+
+# Full pipeline
+./pipeline.sh expXXX
+
+# Individual stages
+uv run ./src/expXXX/create_dataset.py --config-path ./config/expXXX.yaml
+uv run ./src/expXXX/train.py --folds 0 1 2 3 4
+uv run ./src/expXXX/evaluation.py --device mps --model_dir ./output/expXXX
+uv run ./src/expXXX/inference.py --config-path ./config/expXXX.yaml --model-dir ./output/expXXX
+
+# Pre-commit hooks
+pre-commit install
+pre-commit run --all-files
+
+# Docker
+docker compose up --build        # Build & start
+docker compose up -d             # Background
+docker compose down              # Stop
+
+# Streamlit apps
+uv run streamlit run app/oof_analysis_app.py
+```
+
+---
+
+## Pipeline
+
+```
+input/train.csv
+    │
+    ▼ [create_dataset.py]
+output/expXXX/preprocessed_train.csv (with fold column)
+    │
+    ▼ [train.py] × K folds
+output/expXXX/fold0.ckpt ~ foldK.ckpt
+    │
+    ▼ [evaluation.py]
+output/expXXX/oofs.csv + results.json
+    │
+    ▼ [inference.py]
+output/expXXX/submission.csv
+```
+
+---
+
+## Configuration Schema (config/expXXX.yaml)
+
+```yaml
+experiment:
+  name: expXXX
+  seed: 1129
+
+dataset:
+  input_dir: ./input
+  output_dir: ./output
+  n_folds: 3                    # 3 or 5
+  shuffle: true
+
+model:
+  name: "vit_large_patch16_dinov3.lvd1689m"  # timm model name
+  pretrained: true
+  in_channels: 3
+  freeze_backbone: true         # Freeze backbone, train head only
+
+loss:
+  name: "pinball"               # smoothl1, mse, pinball, etc.
+  params:
+    quantile: 0.5
+
+aux_loss:                       # Optional auxiliary loss
+  name: "aux_loss"
+  params: {}
+  weight: 0.1
+
+trainer:
+  train:
+    epochs: 100
+    warmup_epochs: 3
+    batch_size: 16
+    num_workers: 4
+    precision: "16-mixed"       # Mixed precision
+    optimizer:
+      opt: "adamw"
+      lr: 1e-3
+      weight_decay: 1e-2
+    scheduler:
+      sched: "cosine"
+    ema:
+      decay: 0.995              # Exponential moving average
+    use_wandb: true
+  valid:
+    batch_size: 32
+
+augmentation:
+  train:
+    image_size: 512
+    horizontal_flip: 0.5
+    vertical_flip: 0.5
+    mixup:
+      enabled: true
+      alpha: 0.2
+      prob: 0.5
+  valid:
+    image_size: 512
+```
+
+---
+
+## Key ML Patterns
+
+### Model Architecture (models.py)
+
+The model predicts **3 base components** (Clover, Dead, Green) and derives the remaining 2 via physical constraints:
+
+```python
+# Predict 3 → derive 5
+pred_3 = clamp(head(features), min=0)  # Non-negative
+GDM = Clover + Green
+Total = Clover + Dead + Green
+output = [Clover, Dead, Green, GDM, Total]  # (B, 5)
+```
+
+An auxiliary head predicts 2 additional targets (GDM, Total directly) for regularization.
+
+### Common Techniques Across Experiments
+
+- **Frozen backbone**: timm pretrained backbone (DINOv3-large) frozen, only head trained
+- **LoRA fine-tuning**: Some experiments use peft LoRA on the backbone (exp037, exp039, exp043)
+- **EMA**: Exponential moving average of model weights (decay ~0.995)
+- **Mixup**: Applied during training with configurable alpha/probability
+- **3-fold or 5-fold CV**: State-stratified K-fold cross-validation
+- **Mixed precision**: fp16-mixed for training speed
+- **Non-negative clamp**: All predictions clamped to >= 0 (biomass is non-negative)
+
+### Backbone Progression
+
+exp000–024 (ResNet/basic) → exp025–027 (DINOv2, Qwen3-VL) → exp028+ (DINOv3-large) → exp036 (SigLIP) → exp040+ (DINOv3 + optimized CV/loss)
+
+---
+
+## Environment Variables
+
+Required in `.env` (see `.env.example`):
+
+| Variable | Purpose |
+|----------|---------|
+| HF_TOKEN | HuggingFace Hub token (for gated models like DINOv3) |
+| WANDB_API_KEY | Weights & Biases experiment tracking |
+| KAGGLE_USERNAME | Kaggle API authentication |
+| KAGGLE_KEY | Kaggle API key |
+
+---
+
 ## Steering Rules（.steering/ 運用）
 
 ### 命名規則
@@ -127,6 +397,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **作成タイミング:** 実験計画確定時（実装前）に骨子を作成し、CV完了後に結果を追記する。
 
+**現在のドキュメント:** exp025–exp047（23件）
+
 **テンプレート雛形:**
 ```markdown
 # expXXX: [実験タイトル]
@@ -150,28 +422,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ---
 
-## 開発コマンド
-
-```bash
-# 依存関係
-uv sync
-
-# コード品質（Ruff）
-uv run ruff format .
-uv run ruff check .
-uv run ruff check --fix .
-
-# パイプライン実行
-./pipeline.sh expXXX
-
-# 個別実行
-uv run ./src/expXXX/train.py --folds 0 1 2 3 4
-uv run ./src/expXXX/evaluation.py --device mps --model_dir ./output/expXXX
-uv run ./src/expXXX/inference.py --config-path ./config/expXXX.yaml --model-dir ./output/expXXX
-```
-
----
-
 ## カスタムエージェント（.claude/agents/）
 
 | エージェント | 説明 | 呼び出し例 |
@@ -181,9 +431,33 @@ uv run ./src/expXXX/inference.py --config-path ./config/expXXX.yaml --model-dir 
 | error-analyzer | エラーログ解析・原因特定 | 「エラーを解析して」「なぜ失敗したか」 |
 | web-summarizer | Web検索結果の要約レポート作成 | 「〇〇を調べて要約して」 |
 
+### カスタムコマンド（.claude/commands/）
+
+| コマンド | 説明 |
+|---------|------|
+| /review-exp | ステアリング・実験ドキュメントのレビュー |
+| /stage-exp | 実験ファイルの git add（src/, config/, doc/, .steering/） |
+
 ### 出力先
 
 - code-reviewer: `.log/review/YYYYMMDD-expXXX-full-review.md`
 - data-analyzer: `.log/eda/YYYYMMDD-[データセット名]-eda.md`
 - error-analyzer: `.log/error/YYYYMMDD-expXXX-[タスク名].md`
 - web-summarizer: `./reports/YYYY-MM-DD_topic.md`
+
+---
+
+## CI/CD
+
+### GitHub Actions Workflows
+
+| Workflow | File | Trigger |
+|----------|------|---------|
+| Ruff lint | `.github/workflows/ruff.yml` | Push/PR |
+| Claude Code | `.github/workflows/claude.yml` | Issue/PR events |
+| Claude Code Review | `.github/workflows/claude-code-review.yml` | PR events |
+
+### Pre-commit Hooks
+
+- **ruff**: Auto-fix lint issues + format on commit
+- **detect-secrets**: Prevent credential leaks
